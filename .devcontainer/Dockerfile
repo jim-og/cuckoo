@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Install rustup components
+RUN rustup component add rustfmt clippy
+
 RUN cargo install just
 
 # Set working directory
