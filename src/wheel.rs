@@ -43,7 +43,7 @@ impl Wheel {
     }
 
     pub fn insert(&mut self, timer: Timer) {
-        let index = ((timer.pop_time() / self.resolution) % self.buckets.len()) as usize;
+        let index = (timer.pop_time() / self.resolution) % self.buckets.len();
         self.buckets
             .get_mut(index)
             .expect("Expected bucket at index")
@@ -57,7 +57,7 @@ impl Wheel {
     }
 
     fn bucket_index(&self, timestamp: TimeT) -> usize {
-        ((timestamp / self.resolution) % self.buckets.len()) as usize
+        (timestamp / self.resolution) % self.buckets.len()
     }
 
     pub fn round_timestamp(&self, timestamp: TimeT) -> TimeT {

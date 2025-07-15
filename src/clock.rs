@@ -11,26 +11,35 @@ pub struct SystemClock;
 
 impl Clock for SystemClock {
     fn now(&self) -> TimeT {
-        Utc::now().timestamp_millis() as usize
+        Utc::now().timestamp_millis() as TimeT
     }
 }
 
-pub struct FakeClock {
-    current: TimeT,
-}
+#[cfg(test)]
+pub mod tests {
+    use crate::clock::{Clock, TimeT};
+    use parking_lot::Mutex;
 
-impl FakeClock {
-    pub fn new(start: TimeT) -> Self {
-        Self { current: start }
+    pub struct FakeClock {
+        current: Mutex<TimeT>,
     }
 
-    pub fn advance(&mut self, duration: TimeT) {
-        self.current += duration;
-    }
-}
+    impl FakeClock {
+        pub fn new(start: TimeT) -> Self {
+            Self {
+                current: Mutex::new(start),
+            }
+        }
 
-impl Clock for FakeClock {
-    fn now(&self) -> TimeT {
-        self.current
+        pub fn advance(&self, duration: TimeT) {
+            let mut guard = self.current.lock();
+            *guard += duration;
+        }
+    }
+
+    impl Clock for FakeClock {
+        fn now(&self) -> TimeT {
+            *self.current.lock()
+        }
     }
 }

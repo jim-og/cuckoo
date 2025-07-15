@@ -13,7 +13,8 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new(id: TimerId, start_time: TimeT, interval: TimeT) -> Self {
+    pub fn new(start_time: TimeT, interval: TimeT) -> Self {
+        let id = TimerId::new_v4();
         Self {
             id,
             start_time,
@@ -27,8 +28,9 @@ impl Timer {
 }
 
 impl Ord for Timer {
+    // TODO check ordering
     fn cmp(&self, other: &Self) -> Ordering {
-        (other.pop_time()).cmp(&(&self.pop_time()))
+        (other.pop_time()).cmp(&self.pop_time())
     }
 }
 

@@ -114,4 +114,100 @@ impl Store {
     }
 }
 
-// test min-heap structure
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{clock::tests::FakeClock, wheel};
+
+    const TIMER_GRANULARITY_MS: TimeT = wheel::SHORT_WHEEL_RESOLUTION_MS;
+
+    fn setup() -> (Arc<FakeClock>, Store) {
+        let clock = Arc::new(FakeClock::new(0));
+        let store = Store::new(clock.clone());
+        (clock, store)
+    }
+
+    #[test]
+    fn test_short_timer() {
+        let (clock, mut store) = setup();
+        store.insert(Timer::new(clock.now(), 100));
+
+        clock.advance(100 - TIMER_GRANULARITY_MS);
+        assert_eq!(0, store.pop().len());
+        clock.advance(2 * TIMER_GRANULARITY_MS);
+        assert_eq!(1, store.pop().len());
+    }
+
+    #[test]
+    fn test_short_timer_with_offset() {
+        let (clock, mut store) = setup();
+        store.insert(Timer::new(clock.now(), 1600));
+
+        clock.advance(1600 - TIMER_GRANULARITY_MS);
+        assert_eq!(0, store.pop().len());
+        clock.advance(2 * TIMER_GRANULARITY_MS);
+        assert_eq!(1, store.pop().len());
+    }
+
+    #[test]
+    fn test_really_long_timer() {
+        let (clock, mut store) = setup();
+        store.insert(Timer::new(clock.now(), 3600 * 1000 * 10));
+
+        clock.advance(3600 * 1000 * 10 - TIMER_GRANULARITY_MS);
+        assert_eq!(0, store.pop().len());
+        clock.advance(2 * TIMER_GRANULARITY_MS);
+        assert_eq!(1, store.pop().len());
+    }
+
+    #[test]
+    fn test_multiple_really_long_timers() {
+        let (clock, mut store) = setup();
+        store.insert(Timer::new(clock.now(), 3600 * 1000 * 10));
+        store.insert(Timer::new(clock.now(), 3600 * 1000 * 10));
+
+        clock.advance(3600 * 1000 * 10 - TIMER_GRANULARITY_MS);
+        assert_eq!(0, store.pop().len());
+        clock.advance(2 * TIMER_GRANULARITY_MS);
+        assert_eq!(2, store.pop().len());
+    }
+
+    #[test]
+    fn test_overdue_timers() {
+        let (clock, mut store) = setup();
+        clock.advance(500);
+        assert_eq!(0, store.pop().len());
+
+        // Insert a timer set to pop in the past.
+        store.insert(Timer::new(0, 100));
+        assert_eq!(1, store.pop().len());
+    }
+
+    #[test]
+    fn test_mixture_of_timer_lengths() {
+        // Add timers that pop at the same time but add them in such a way that one is added in the heap,
+        // one in the long wheel, and one in the short wheel.
+        let (clock, mut store) = setup();
+
+        // Timer 1 pops in 1h:0m:1s:500ms.
+        store.insert(Timer::new(clock.now(), (60 * 60 * 1000) + (1 * 1000) + 500));
+
+        // Advance by 1h, no timers have popped.
+        clock.advance(60 * 60 * 1000);
+        assert_eq!(0, store.pop().len());
+
+        // Timer 2 pops in 1s:500ms.
+        store.insert(Timer::new(clock.now(), (1 * 1000) + 500));
+
+        // Advance by 1s, no timers have popped.
+        clock.advance(1 * 1000);
+        assert_eq!(0, store.pop().len());
+
+        // Timer 3 pops in 500ms.
+        store.insert(Timer::new(clock.now(), 500));
+
+        // Advance by 500ms, all timers pop.
+        clock.advance(500 + TIMER_GRANULARITY_MS);
+        assert_eq!(3, store.pop().len());
+    }
+}
