@@ -25,5 +25,5 @@ fn main() {
     let timers = store.pop();
     timers
         .iter()
-        .for_each(|timer| println!("timer: {}", timer.id));
+        .for_each(|timer| println!("timer: {}", timer.id.uuid()));
 }

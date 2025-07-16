@@ -3,7 +3,18 @@ use std::cmp::Ordering;
 use uuid::Uuid;
 
 /// A Universally Unique Identifier (UUID) for Timers.
-pub type TimerId = Uuid;
+#[derive(PartialEq, Eq, Hash)]
+pub struct TimerId(pub Uuid);
+
+impl TimerId {
+    pub fn new() -> Self {
+        TimerId(Uuid::new_v4())
+    }
+
+    pub fn uuid(&self) -> Uuid {
+        self.0
+    }
+}
 
 #[derive(PartialEq, Eq, Hash)]
 pub struct Timer {
@@ -14,7 +25,7 @@ pub struct Timer {
 
 impl Timer {
     pub fn new(start_time: TimeT, interval: TimeT) -> Self {
-        let id = TimerId::new_v4();
+        let id = TimerId::new();
         Self {
             id,
             start_time,
