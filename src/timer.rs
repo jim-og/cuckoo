@@ -24,8 +24,7 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new(start_time: TimeT, interval: TimeT) -> Self {
-        let id = TimerId::new();
+    pub fn new(id: TimerId, start_time: TimeT, interval: TimeT) -> Self {
         Self {
             id,
             start_time,

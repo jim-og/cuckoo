@@ -130,7 +130,7 @@ mod tests {
     #[test]
     fn test_short_timer() {
         let (clock, mut store) = setup();
-        store.insert(Timer::new(clock.now(), 100));
+        store.insert(Timer::new(TimerId::new(), clock.now(), 100));
 
         clock.advance(100 - TIMER_GRANULARITY_MS);
         assert_eq!(0, store.pop().len());
@@ -141,7 +141,7 @@ mod tests {
     #[test]
     fn test_short_timer_with_offset() {
         let (clock, mut store) = setup();
-        store.insert(Timer::new(clock.now(), 1600));
+        store.insert(Timer::new(TimerId::new(), clock.now(), 1600));
 
         clock.advance(1600 - TIMER_GRANULARITY_MS);
         assert_eq!(0, store.pop().len());
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_really_long_timer() {
         let (clock, mut store) = setup();
-        store.insert(Timer::new(clock.now(), 3600 * 1000 * 10));
+        store.insert(Timer::new(TimerId::new(), clock.now(), 3600 * 1000 * 10));
 
         clock.advance(3600 * 1000 * 10 - TIMER_GRANULARITY_MS);
         assert_eq!(0, store.pop().len());
@@ -163,8 +163,8 @@ mod tests {
     #[test]
     fn test_multiple_really_long_timers() {
         let (clock, mut store) = setup();
-        store.insert(Timer::new(clock.now(), 3600 * 1000 * 10));
-        store.insert(Timer::new(clock.now(), 3600 * 1000 * 10));
+        store.insert(Timer::new(TimerId::new(), clock.now(), 3600 * 1000 * 10));
+        store.insert(Timer::new(TimerId::new(), clock.now(), 3600 * 1000 * 10));
 
         clock.advance(3600 * 1000 * 10 - TIMER_GRANULARITY_MS);
         assert_eq!(0, store.pop().len());
@@ -179,7 +179,7 @@ mod tests {
         assert_eq!(0, store.pop().len());
 
         // Insert a timer set to pop in the past.
-        store.insert(Timer::new(0, 100));
+        store.insert(Timer::new(TimerId::new(), 0, 100));
         assert_eq!(1, store.pop().len());
     }
 
@@ -190,21 +190,25 @@ mod tests {
         let (clock, mut store) = setup();
 
         // Timer 1 pops in 1h:0m:1s:500ms.
-        store.insert(Timer::new(clock.now(), (60 * 60 * 1000) + (1 * 1000) + 500));
+        store.insert(Timer::new(
+            TimerId::new(),
+            clock.now(),
+            (60 * 60 * 1000) + (1 * 1000) + 500,
+        ));
 
         // Advance by 1h, no timers have popped.
         clock.advance(60 * 60 * 1000);
         assert_eq!(0, store.pop().len());
 
         // Timer 2 pops in 1s:500ms.
-        store.insert(Timer::new(clock.now(), (1 * 1000) + 500));
+        store.insert(Timer::new(TimerId::new(), clock.now(), (1 * 1000) + 500));
 
         // Advance by 1s, no timers have popped.
         clock.advance(1 * 1000);
         assert_eq!(0, store.pop().len());
 
         // Timer 3 pops in 500ms.
-        store.insert(Timer::new(clock.now(), 500));
+        store.insert(Timer::new(TimerId::new(), clock.now(), 500));
 
         // Advance by 500ms, all timers pop.
         clock.advance(500 + TIMER_GRANULARITY_MS);

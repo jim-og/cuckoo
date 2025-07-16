@@ -1,7 +1,7 @@
 use crate::{
     clock::{Clock, SystemClock},
     store::Store,
-    timer::Timer,
+    timer::{Timer, TimerId},
 };
 use core::time;
 use std::{sync::Arc, thread::sleep};
@@ -14,7 +14,7 @@ mod wheel;
 fn main() {
     let clock = Arc::new(SystemClock {});
     let mut store = Store::new(clock.clone());
-    let timer = Timer::new(clock.now(), 1000);
+    let timer = Timer::new(TimerId::new(), clock.now(), 1000);
 
     store.insert(timer);
 
