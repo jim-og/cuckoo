@@ -1,12 +1,9 @@
 use crate::{
     clock::{Clock, TimeT},
     timer::{Timer, TimerId},
-    wheel::{Bucket, Wheel},
+    wheel::{Bucket, TimerHeap, Wheel},
 };
-use std::{
-    collections::{BinaryHeap, HashMap},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 pub struct Store {
     clock: Arc<dyn Clock>,
@@ -15,7 +12,7 @@ pub struct Store {
     short_wheel: Wheel,
     long_wheel: Wheel,
     overdue: Bucket,
-    heap: BinaryHeap<Timer>,
+    heap: TimerHeap,
 }
 
 impl Store {
@@ -31,18 +28,21 @@ impl Store {
             short_wheel,
             long_wheel: Wheel::new_long_wheel(),
             overdue: Bucket::default(),
-            heap: BinaryHeap::new(),
+            heap: TimerHeap::new(),
         }
     }
 
     pub fn insert(&mut self, timer: Timer) {
-        if self.lookup.contains_key(&timer.id) {
-            // TODO handle error
-            panic!("A timer already exists with this ID.")
+        // Add timer ID and pop time to lookup.
+        if self
+            .lookup
+            .insert(timer.id.clone(), timer.clone())
+            .is_some()
+        {
+            panic!("A timer already exists with this ID.");
         }
 
-        // TODO add timer to lookup table
-
+        // TODO handle when timer already exists in a wheel
         if timer.pop_time() < self.tick {
             // Timer is overdue.
             self.overdue.insert(timer);
@@ -68,7 +68,16 @@ impl Store {
 
         for _ in 0..ticks {
             // Pop timers in the current bucket.
-            timers.extend(self.short_wheel.pop(self.tick));
+            let popped_timers = self.short_wheel.pop(self.tick);
+
+            // Remove from lookup.
+            popped_timers.iter().for_each(|timer| {
+                if self.lookup.remove(&timer.id).is_none() {
+                    panic!("Timer does not exist in lookup.")
+                }
+            });
+
+            timers.extend(popped_timers);
 
             // Advance time and fill wheels.
             self.tick += self.short_wheel.resolution;
@@ -76,6 +85,29 @@ impl Store {
         }
 
         timers
+    }
+
+    pub fn remove(&mut self, id: &TimerId) {
+        // Remove from lookup.
+        // TODO handle errors.
+        if let Some(timer) = self.lookup.remove(id) {
+            // Remove from bucket.
+            if timer.pop_time() < self.tick {
+                // Timer is overdue.
+                self.overdue.remove(&timer);
+            } else if self.short_wheel.should_insert(&self.tick, &timer) {
+                // Timer lives in short wheel.
+                self.short_wheel.remove(&timer);
+            } else if self.long_wheel.should_insert(&self.tick, &timer) {
+                // Timer lives in long wheel.
+                self.long_wheel.remove(&timer);
+            } else {
+                // Timer lives in heap.
+                self.heap.remove(&timer);
+            }
+        } else {
+            panic!("Timer does not exist in lookup.")
+        }
     }
 
     fn fill_wheels(&mut self) {
@@ -214,4 +246,58 @@ mod tests {
         clock.advance(500 + TIMER_GRANULARITY_MS);
         assert_eq!(3, store.pop().len());
     }
+
+    #[test]
+    fn test_heap() {
+        // Test that the timer which is next to pop is at the top of the heap.
+        let (clock, mut store) = setup();
+
+        let id_1 = TimerId::new();
+        let id_2 = TimerId::new();
+        let id_3 = TimerId::new();
+
+        // Set the timers so that:
+        // - timer_2 is the first one to pop.
+        // - timer_3 is the next one to pop.
+        // - timer_1 is the last one to pop.
+
+        let timer_1 = Timer::new(
+            id_1,
+            clock.now(),
+            3600 * 1000 * 10 + TIMER_GRANULARITY_MS * 2,
+        );
+
+        let timer_2_interval = 3600 * 1000 + TIMER_GRANULARITY_MS * 4;
+        let timer_2 = Timer::new(
+            id_2.clone(),
+            clock.now(),
+            3600 * 1000 + TIMER_GRANULARITY_MS * 4,
+        );
+
+        let timer_3 = Timer::new(
+            id_3,
+            clock.now(),
+            3600 * 1000 * 5 + TIMER_GRANULARITY_MS * 6,
+        );
+
+        store.insert(timer_1);
+        store.insert(timer_2);
+        store.insert(timer_3);
+
+        // Advance time to when timer_2 should pop.
+        clock.advance(timer_2_interval + TIMER_GRANULARITY_MS);
+
+        let timers = store.pop();
+        assert_eq!(1, timers.len());
+
+        if let Some(timer) = timers.iter().next() {
+            assert_eq!(timer.id, id_2);
+        } else {
+            panic!("Expected there to be a popped timer.");
+        }
+    }
 }
+
+// Test timer insert with existing ID
+// Test timers are in the expected wheel
+// Test timer delete
