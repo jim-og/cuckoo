@@ -150,6 +150,7 @@ impl Store {
 mod tests {
     use super::*;
     use crate::{clock::tests::FakeClock, wheel};
+    use test_case::test_case;
 
     const TIMER_GRANULARITY_MS: TimeT = wheel::SHORT_WHEEL_RESOLUTION_MS;
 
@@ -159,41 +160,36 @@ mod tests {
         (clock, store)
     }
 
-    #[test]
-    fn test_short_timer() {
+    #[test_case(100; "short")]
+    #[test_case(1600; "long")]
+    #[test_case(3600 * 1000 * 10; "really_long")]
+    fn timer_pops_after_interval(interval: TimeT) {
         let (clock, mut store) = setup();
-        store.insert(Timer::new(TimerId::new(), clock.now(), 100));
+        store.insert(Timer::new(TimerId::new(), clock.now(), interval));
 
-        clock.advance(100 - TIMER_GRANULARITY_MS);
+        clock.advance(interval - TIMER_GRANULARITY_MS);
         assert_eq!(0, store.pop().len());
+
         clock.advance(2 * TIMER_GRANULARITY_MS);
         assert_eq!(1, store.pop().len());
     }
 
-    #[test]
-    fn test_short_timer_with_offset() {
+    #[test_case(100; "short")]
+    #[test_case(1600; "long")]
+    #[test_case(3600 * 1000 * 10; "really_long")]
+    fn timer_removal_after_interval(interval: TimeT) {
         let (clock, mut store) = setup();
-        store.insert(Timer::new(TimerId::new(), clock.now(), 1600));
+        let id = TimerId::new();
+        store.insert(Timer::new(id.clone(), clock.now(), interval));
 
-        clock.advance(1600 - TIMER_GRANULARITY_MS);
+        store.remove(&id);
+
+        clock.advance(interval + TIMER_GRANULARITY_MS);
         assert_eq!(0, store.pop().len());
-        clock.advance(2 * TIMER_GRANULARITY_MS);
-        assert_eq!(1, store.pop().len());
     }
 
     #[test]
-    fn test_really_long_timer() {
-        let (clock, mut store) = setup();
-        store.insert(Timer::new(TimerId::new(), clock.now(), 3600 * 1000 * 10));
-
-        clock.advance(3600 * 1000 * 10 - TIMER_GRANULARITY_MS);
-        assert_eq!(0, store.pop().len());
-        clock.advance(2 * TIMER_GRANULARITY_MS);
-        assert_eq!(1, store.pop().len());
-    }
-
-    #[test]
-    fn test_multiple_really_long_timers() {
+    fn multiple_really_long_timers_pop() {
         let (clock, mut store) = setup();
         store.insert(Timer::new(TimerId::new(), clock.now(), 3600 * 1000 * 10));
         store.insert(Timer::new(TimerId::new(), clock.now(), 3600 * 1000 * 10));
@@ -205,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    fn test_overdue_timers() {
+    fn overdue_timers_pop() {
         let (clock, mut store) = setup();
         clock.advance(500);
         assert_eq!(0, store.pop().len());
@@ -216,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mixture_of_timer_lengths() {
+    fn mixture_of_timer_lengths_pop() {
         // Add timers that pop at the same time but add them in such a way that one is added in the heap,
         // one in the long wheel, and one in the short wheel.
         let (clock, mut store) = setup();
@@ -248,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    fn test_heap() {
+    fn heap_timers_pop() {
         // Test that the timer which is next to pop is at the top of the heap.
         let (clock, mut store) = setup();
 
