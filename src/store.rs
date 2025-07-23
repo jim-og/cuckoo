@@ -177,6 +177,22 @@ mod tests {
     #[test_case(100; "short")]
     #[test_case(1600; "long")]
     #[test_case(3600 * 1000 * 10; "really_long")]
+    fn multiple_timers_pop(interval: TimeT) {
+        let (clock, mut store) = setup();
+
+        store.insert(Timer::new(TimerId::new(), clock.now(), interval));
+        store.insert(Timer::new(TimerId::new(), clock.now(), interval));
+
+        clock.advance(interval - TIMER_GRANULARITY_MS);
+        assert_eq!(0, store.pop().len());
+
+        clock.advance(2 * TIMER_GRANULARITY_MS);
+        assert_eq!(2, store.pop().len());
+    }
+
+    #[test_case(100; "short")]
+    #[test_case(1600; "long")]
+    #[test_case(3600 * 1000 * 10; "really_long")]
     fn timer_removal_after_interval(interval: TimeT) {
         let (clock, mut store) = setup();
         let id = TimerId::new();
@@ -186,18 +202,6 @@ mod tests {
 
         clock.advance(interval + TIMER_GRANULARITY_MS);
         assert_eq!(0, store.pop().len());
-    }
-
-    #[test]
-    fn multiple_really_long_timers_pop() {
-        let (clock, mut store) = setup();
-        store.insert(Timer::new(TimerId::new(), clock.now(), 3600 * 1000 * 10));
-        store.insert(Timer::new(TimerId::new(), clock.now(), 3600 * 1000 * 10));
-
-        clock.advance(3600 * 1000 * 10 - TIMER_GRANULARITY_MS);
-        assert_eq!(0, store.pop().len());
-        clock.advance(2 * TIMER_GRANULARITY_MS);
-        assert_eq!(2, store.pop().len());
     }
 
     #[test]
