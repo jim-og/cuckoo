@@ -127,6 +127,8 @@ impl TimerHeap {
                 if let Some(timer) = self.heap.pop() {
                     self.tombstones.remove(&timer);
                 }
+            } else {
+                break;
             }
         }
     }
