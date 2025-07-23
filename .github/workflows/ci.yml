@@ -16,11 +16,28 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Cache cargo-tarpaulin and cargo registry
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/cargo-tarpaulin
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-tarpaulin-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-tarpaulin-
+
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         components: clippy, rustfmt
+
+    - name: Install tarpaulin (if not cached)
+      run: |
+        if ! command -v cargo-tarpaulin &> /dev/null; then
+          cargo install cargo-tarpaulin
+        fi
 
     - name: Run rustfmt check
       run: cargo fmt -- --check
@@ -30,3 +47,13 @@ jobs:
 
     - name: Run unit tests
       run: cargo test
+
+    - name: Run coverage check with tarpaulin
+      run: cargo tarpaulin --verbose --out Xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: cobertura.xml
+        fail_ci_if_error: false
