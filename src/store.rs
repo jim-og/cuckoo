@@ -70,6 +70,7 @@ impl Store {
             let popped_timers = self.short_wheel.pop(self.tick);
 
             // Remove from lookup.
+            popped_timers.iter().for_each(|timer| {
                 if self.lookup.remove(&timer.id).is_none() {
                     panic!("Timer does not exist in lookup.")
                 }
