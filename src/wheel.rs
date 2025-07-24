@@ -103,9 +103,9 @@ impl TimerHeap {
         self.heap.push(timer)
     }
 
-    pub fn remove(&mut self, timer: &Timer) {
+    pub fn remove(&mut self, timer: &Timer) -> bool {
         // TODO log if the tombstone already existed.
-        self.tombstones.insert(timer.clone());
+        self.tombstones.insert(timer.clone())
     }
 
     /// Wrapper around the heap peek which buries tombstoned timers.

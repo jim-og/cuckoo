@@ -42,7 +42,6 @@ impl Store {
             panic!("A timer already exists with this ID.");
         }
 
-        // TODO handle when timer already exists in a wheel
         if timer.pop_time() < self.tick {
             // Timer is overdue.
             self.overdue.insert(timer);
@@ -71,7 +70,6 @@ impl Store {
             let popped_timers = self.short_wheel.pop(self.tick);
 
             // Remove from lookup.
-            popped_timers.iter().for_each(|timer| {
                 if self.lookup.remove(&timer.id).is_none() {
                     panic!("Timer does not exist in lookup.")
                 }
@@ -87,26 +85,26 @@ impl Store {
         timers
     }
 
-    pub fn remove(&mut self, id: &TimerId) {
+    pub fn remove(&mut self, id: &TimerId) -> bool {
         // Remove from lookup.
-        // TODO handle errors.
         if let Some(timer) = self.lookup.remove(id) {
             // Remove from bucket.
             if timer.pop_time() < self.tick {
                 // Timer is overdue.
-                self.overdue.remove(&timer);
+                self.overdue.remove(&timer)
             } else if self.short_wheel.should_insert(&self.tick, &timer) {
                 // Timer lives in short wheel.
-                self.short_wheel.remove(&timer);
+                self.short_wheel.remove(&timer)
             } else if self.long_wheel.should_insert(&self.tick, &timer) {
                 // Timer lives in long wheel.
-                self.long_wheel.remove(&timer);
+                self.long_wheel.remove(&timer)
             } else {
                 // Timer lives in heap.
-                self.heap.remove(&timer);
+                self.heap.remove(&timer)
             }
         } else {
-            panic!("Timer does not exist in lookup.")
+            eprintln!("Timer does not exist in lookup.");
+            false
         }
     }
 
@@ -205,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    fn overdue_timers_pop() {
+    fn overdue_timer_pop() {
         let (clock, mut store) = setup();
         clock.advance(500);
         assert_eq!(0, store.pop().len());
@@ -213,6 +211,20 @@ mod tests {
         // Insert a timer set to pop in the past.
         store.insert(Timer::new(TimerId::new(), 0, 100));
         assert_eq!(1, store.pop().len());
+    }
+
+    #[test]
+    fn overdue_timer_removal() {
+        let (clock, mut store) = setup();
+        clock.advance(500);
+        assert_eq!(0, store.pop().len());
+
+        // Insert a timer set to pop in the past.
+        let id = TimerId::new();
+        store.insert(Timer::new(id.clone(), 0, 100));
+
+        store.remove(&id);
+        assert_eq!(0, store.pop().len());
     }
 
     #[test]
@@ -297,7 +309,3 @@ mod tests {
         }
     }
 }
-
-// Test timer insert with existing ID
-// Test timers are in the expected wheel
-// Test timer delete
