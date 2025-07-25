@@ -16,16 +16,16 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Cache cargo-tarpaulin and cargo registry
+    - name: Cache cargo llvm-cov and cargo registry
       uses: actions/cache@v3
       with:
         path: |
-          ~/.cargo/bin/cargo-tarpaulin
+          ~/.cargo/bin/cargo-llvm-cov
           ~/.cargo/registry
           ~/.cargo/git
-        key: ${{ runner.os }}-cargo-tarpaulin-${{ hashFiles('Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-llvm-cov-${{ hashFiles('Cargo.lock') }}
         restore-keys: |
-          ${{ runner.os }}-cargo-tarpaulin-
+          ${{ runner.os }}-cargo-llvm-cov-
 
     - name: Install Rust
       uses: actions-rs/toolchain@v1
@@ -33,10 +33,10 @@ jobs:
         toolchain: stable
         components: clippy, rustfmt
 
-    - name: Install tarpaulin (if not cached)
+    - name: Install cargo-llvm-cov (if not cached)
       run: |
-        if ! command -v cargo-tarpaulin &> /dev/null; then
-          cargo install cargo-tarpaulin
+        if ! command -v cargo-llvm-cov &> /dev/null; then
+          cargo install cargo-llvm-cov
         fi
 
     - name: Run rustfmt check
@@ -45,15 +45,12 @@ jobs:
     - name: Run clippy
       run: cargo clippy -- -D warnings
 
-    - name: Run unit tests
-      run: cargo test
+    - name: Run coverage with cargo-llvm-cov
+      run: cargo llvm-cov --lcov --output-path lcov.info
 
-    - name: Run coverage check with tarpaulin
-      run: cargo tarpaulin --verbose --out Xml
-    
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        file: cobertura.xml
+        file: lcov.info
         fail_ci_if_error: false
