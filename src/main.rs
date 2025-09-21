@@ -7,11 +7,13 @@ use core::time;
 use std::{sync::Arc, thread::sleep};
 
 mod clock;
+mod server;
 mod store;
 mod timer;
 mod wheel;
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let clock = Arc::new(SystemClock {});
     let mut store = Store::new(clock.clone());
 
@@ -32,4 +34,6 @@ fn main() {
         .for_each(|timer| println!("timer: {}", timer.id.uuid()));
 
     store.remove(&timer_2_id);
+
+    server::run_server().await
 }
