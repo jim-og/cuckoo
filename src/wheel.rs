@@ -54,8 +54,7 @@ impl Wheel {
     pub fn pop(&mut self, timestamp: TimeT) -> Bucket {
         let index = self.bucket_index(timestamp);
         std::mem::take(
-            &mut self
-                .buckets
+            self.buckets
                 .get_mut(index)
                 .expect("Expected bucket at index"),
         )

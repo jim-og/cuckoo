@@ -6,7 +6,6 @@ use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use hyper_util::service::TowerToHyperService;
 use std::net::SocketAddr;
-use std::u64;
 use tokio::net::TcpListener;
 use tower::{Service, ServiceBuilder};
 
