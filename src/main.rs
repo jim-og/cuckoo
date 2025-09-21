@@ -6,6 +6,7 @@ use crate::{
 use core::time;
 use std::{sync::Arc, thread::sleep};
 
+mod client;
 mod clock;
 mod server;
 mod store;
@@ -35,5 +36,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     store.remove(&timer_2_id);
 
+    let _ = client::fetch_url().await;
     server::run_server().await
 }

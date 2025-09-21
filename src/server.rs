@@ -152,7 +152,7 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>
             _ = &mut signal => {
                 // Shutdown signal completed, stop the accept event loop
                 drop(listener);
-                eprintln!("Graceful shutdown signal received.");
+                eprintln!("\nGraceful shutdown signal received.");
                 break;
             }
         }
