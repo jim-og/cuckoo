@@ -2,14 +2,15 @@ use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty, Full};
 use hyper::body::{Body, Bytes, Frame, Incoming};
 use hyper::server::conn::http1;
-use hyper::service::{Service, service_fn};
 use hyper::{Method, Request, Response, StatusCode};
-use hyper_util::rt::{TokioIo, TokioTimer};
+use hyper_util::rt::TokioIo;
+use hyper_util::service::TowerToHyperService;
 use std::net::SocketAddr;
 use std::u64;
 use tokio::net::TcpListener;
-use tower::ServiceBuilder;
+use tower::{Service, ServiceBuilder};
 
+#[derive(Debug, Clone)]
 pub struct Logger<S> {
     inner: S,
 }
@@ -22,15 +23,22 @@ type Req = Request<Incoming>;
 
 impl<S> Service<Req> for Logger<S>
 where
-    S: Service<Req>,
+    S: Service<Req> + Clone,
 {
     type Response = S::Response;
     type Error = S::Error;
     type Future = S::Future;
 
-    fn call(&self, req: Req) -> Self::Future {
+    fn call(&mut self, req: Req) -> Self::Future {
         println!("processing request: {} {}", req.method(), req.uri().path());
         self.inner.call(req)
+    }
+
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
     }
 }
 
@@ -106,16 +114,13 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>
         let io = TokioIo::new(stream);
         tokio::task::spawn(async move {
             // Bind the incoming connection to our `echo` service
-            let echo_svc = service_fn(echo);
-            let svc = ServiceBuilder::new()
+            let echo_svc = tower::service_fn(echo);
+            let tower_svc = ServiceBuilder::new()
                 .layer_fn(Logger::new)
                 .service(echo_svc);
+            let svc = TowerToHyperService::new(tower_svc);
 
-            if let Err(err) = http1::Builder::new()
-                .timer(TokioTimer::new())
-                .serve_connection(io, svc)
-                .await
-            {
+            if let Err(err) = http1::Builder::new().serve_connection(io, svc).await {
                 eprint!("Error serving connection: {:?}", err);
             }
         });
