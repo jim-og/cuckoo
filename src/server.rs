@@ -4,6 +4,7 @@ use hyper::body::{Body, Bytes, Frame, Incoming};
 use hyper::server::conn::http1;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
+use hyper_util::server::graceful::GracefulShutdown;
 use hyper_util::service::TowerToHyperService;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
@@ -39,6 +40,13 @@ where
     ) -> std::task::Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
+}
+
+async fn shutdown_signal() {
+    // Wait for the CTRL+C signal
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to install CTRL+C signal handler");
 }
 
 async fn echo(
@@ -107,21 +115,59 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on http://{}", addr);
 
+    // Create a HTTP connection builder
+    let http = http1::Builder::new();
+
+    // Create a graceful shutdown watcher
+    let graceful = GracefulShutdown::new();
+
+    // Create a watcher for the shutdown signal to complete
+    let mut signal = std::pin::pin!(shutdown_signal());
+
     // Start an event loop to continuously accept incoming connections
     loop {
-        let (stream, _remote_addr) = listener.accept().await?;
-        let io = TokioIo::new(stream);
-        tokio::task::spawn(async move {
-            // Bind the incoming connection to our `echo` service
-            let echo_svc = tower::service_fn(echo);
-            let tower_svc = ServiceBuilder::new()
-                .layer_fn(Logger::new)
-                .service(echo_svc);
-            let svc = TowerToHyperService::new(tower_svc);
+        tokio::select! {
+            Ok((stream, _remote_addr)) = listener.accept() => {
+                let io = TokioIo::new(stream);
 
-            if let Err(err) = http1::Builder::new().serve_connection(io, svc).await {
-                eprint!("Error serving connection: {:?}", err);
+                // Create the service
+                let echo_svc = tower::service_fn(echo);
+                let tower_svc = ServiceBuilder::new()
+                    .layer_fn(Logger::new)
+                    .service(echo_svc);
+                let svc = TowerToHyperService::new(tower_svc);
+
+                // Bind the connection with the service
+                let conn = http.serve_connection(io, svc);
+
+                // Wrap the connection with a graceful shutdown watcher
+                let watcher = graceful.watch(conn);
+
+                tokio::task::spawn(async move {
+                    if let Err(err) = watcher.await {
+                        eprint!("Error serving connection: {:?}", err);
+                    }
+                });
+            },
+            _ = &mut signal => {
+                // Shutdown signal completed, stop the accept event loop
+                drop(listener);
+                eprintln!("Graceful shutdown signal received.");
+                break;
             }
-        });
+        }
     }
+
+    // Start the shutdown procedure and wait for all connection to complete
+    // with a timeout to limit how long to wait.
+    tokio::select! {
+        _ = graceful.shutdown() => {
+            eprintln!("All connections gracefully closed.");
+        },
+        _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
+            eprintln!("Timed out waiting for all connections to close.");
+        }
+    }
+
+    Ok(())
 }
