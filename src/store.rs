@@ -111,14 +111,14 @@ impl Store {
 
     fn fill_wheels(&mut self) {
         // Refill the long wheel at the end of a long wheel period.
-        if self.tick % self.long_wheel.period == 0 {
+        if self.tick.is_multiple_of(self.long_wheel.period) {
             self.fill_long_wheel();
         }
 
         // Refill the short wheel at the end of a short wheel period.
         // This is done second to the long wheel as timers may need to
         // propogate from heap -> long wheel -> short wheel.
-        if self.tick % self.short_wheel.period == 0 {
+        if self.tick.is_multiple_of(self.short_wheel.period) {
             self.fill_short_wheel();
         }
     }
