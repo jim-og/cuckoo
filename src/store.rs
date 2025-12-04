@@ -238,7 +238,7 @@ mod tests {
         store.insert(Timer::new(
             TimerId::new(),
             clock.now(),
-            (60 * 60 * 1000) + (1 * 1000) + 500,
+            (60 * 60 * 1000) + (1000) + 500,
         ));
 
         // Advance by 1h, no timers have popped.
@@ -246,10 +246,10 @@ mod tests {
         assert_eq!(0, store.pop().len());
 
         // Timer 2 pops in 1s:500ms.
-        store.insert(Timer::new(TimerId::new(), clock.now(), (1 * 1000) + 500));
+        store.insert(Timer::new(TimerId::new(), clock.now(), (1000) + 500));
 
         // Advance by 1s, no timers have popped.
-        clock.advance(1 * 1000);
+        clock.advance(1000);
         assert_eq!(0, store.pop().len());
 
         // Timer 3 pops in 500ms.
