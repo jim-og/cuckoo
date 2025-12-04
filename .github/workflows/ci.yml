@@ -32,6 +32,7 @@ jobs:
       with:
         toolchain: stable
         components: clippy, rustfmt
+        profile: minimum
 
     - name: Install cargo-llvm-cov (if not cached)
       run: |
