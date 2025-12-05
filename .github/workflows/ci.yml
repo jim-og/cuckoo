@@ -22,7 +22,6 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt
-          profile: minimal
 
       - name: Run rustfmt check
         run: cargo fmt -- --check
@@ -58,7 +57,6 @@ jobs:
         with:
           toolchain: stable
           components: clippy
-          profile: minimal
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
@@ -102,7 +100,6 @@ jobs:
         with:
           toolchain: stable
           components: llvm-tools-preview
-          profile: minimal
 
       - name: Install cargo-llvm-cov (if not cached)
         run: |
