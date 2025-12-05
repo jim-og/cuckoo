@@ -5,9 +5,9 @@ edition = "2024"
 
 [dependencies]
 chrono = "0.4.42"
-parking_lot = "0.12.4"
+parking_lot = "0.12.5"
 test-case = "3.3.1"
-uuid = { version = "1.18.1", features = ["v4"] }
+uuid = { version = "1.19.0", features = ["v4"] }
 hyper = { version = "1", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
 http-body-util = "0.1"
