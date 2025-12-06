@@ -17,12 +17,11 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Install Rust (minimal profile)
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: rustfmt
-          profile: minimal
 
       - name: Run rustfmt check
         run: cargo fmt -- --check
@@ -53,12 +52,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-target-
 
-      - name: Install Rust (minimal profile)
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: clippy
-          profile: minimal
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
@@ -89,26 +87,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-target-
 
-      - name: Cache cargo-llvm-cov
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin/cargo-llvm-cov
-          key: ${{ runner.os }}-cargo-llvm-cov-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-llvm-cov-
-
-      - name: Install Rust (minimal profile)
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: llvm-tools-preview
-          profile: minimal
 
-      - name: Install cargo-llvm-cov (if not cached)
-        run: |
-          if ! command -v cargo-llvm-cov &> /dev/null; then
-            cargo install cargo-llvm-cov
-          fi
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
 
       - name: Run coverage with cargo-llvm-cov
         run: cargo llvm-cov --lcov --output-path lcov.info
@@ -117,5 +105,4 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: lcov.info
           fail_ci_if_error: false
