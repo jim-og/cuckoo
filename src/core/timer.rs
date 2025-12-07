@@ -1,4 +1,4 @@
-use crate::clock::TimeT;
+use crate::core::clock::TimeT;
 use std::cmp::Ordering;
 use uuid::Uuid;
 

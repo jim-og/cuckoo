@@ -1,4 +1,4 @@
-use crate::{
+use crate::core::{
     clock::{Clock, TimeT},
     timer::{Timer, TimerId},
     wheel::{Bucket, TimerHeap, Wheel},
@@ -148,7 +148,7 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{clock::tests::FakeClock, wheel};
+    use crate::core::{clock::tests::FakeClock, wheel};
     use test_case::test_case;
 
     const TIMER_GRANULARITY_MS: TimeT = wheel::SHORT_WHEEL_RESOLUTION_MS;

@@ -17,7 +17,7 @@ impl Clock for SystemClock {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::clock::{Clock, TimeT};
+    use crate::core::clock::{Clock, TimeT};
     use parking_lot::Mutex;
 
     pub struct FakeClock {
