@@ -10,18 +10,18 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use tokio::sync::oneshot;
 
-pub struct PlatformSpecificModel<S: EventSource> {
+pub struct TimerApp<S: EventSource> {
     service: TimerService,
     event_source: S,
     logger: Arc<dyn Logger>,
 }
 
-impl PlatformSpecificModel<TimerServiceEventSource> {
+impl TimerApp<TimerServiceEventSource> {
     pub async fn new(
         // config
         logger: Arc<dyn Logger>,
     ) -> Result<Self> {
-        let event_source = TimerServiceEventSource::new().await?;
+        let event_source = TimerServiceEventSource::new(logger.clone()).await?;
 
         // Setup publisher
 
@@ -36,7 +36,7 @@ impl PlatformSpecificModel<TimerServiceEventSource> {
 }
 
 #[async_trait(?Send)]
-impl<S> App for PlatformSpecificModel<S>
+impl<S> App for TimerApp<S>
 where
     S: EventSource<Event = TimerServiceEvent>,
 {

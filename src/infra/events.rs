@@ -1,7 +1,10 @@
-use crate::{core::TimerServiceEvent, utils::EventSource};
+use crate::{
+    core::TimerServiceEvent,
+    utils::{EventSource, Logger},
+};
 use anyhow::Result;
 use futures::{Stream, StreamExt};
-use std::pin::Pin;
+use std::{pin::Pin, sync::Arc};
 
 pub type EventStream<T> = Pin<Box<dyn Stream<Item = T>>>;
 pub type TimerServiceEventStream = EventStream<TimerServiceEvent>;
@@ -11,11 +14,13 @@ pub struct TimerServiceEventSource {
 }
 
 impl TimerServiceEventSource {
-    pub async fn new(// config
-        // logger
+    pub async fn new(
+        // config
+        logger: Arc<dyn Logger>,
     ) -> Result<Self> {
-        // Setup receiver
-        // Create stream which maps receiver to TimerService events
+        // TODO Setup receiver
+        // TODO Create stream which maps receiver to TimerService events
+        logger.info("setup timer service event source");
         todo!()
     }
 }

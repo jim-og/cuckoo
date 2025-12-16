@@ -1,4 +1,4 @@
 mod events;
 mod main_program;
-mod platform_specific_model;
+mod timer_app;
 pub use main_program::MainProgram;
