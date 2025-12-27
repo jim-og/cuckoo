@@ -7,6 +7,8 @@ pub use event_handler::EventHandler;
 mod event_source;
 pub use event_source::EventSource;
 
+mod http;
+
 mod lifecycle;
 
 mod logger;
