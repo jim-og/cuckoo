@@ -53,7 +53,11 @@ impl Wheel {
 
     pub fn pop(&mut self, timestamp: TimeT) -> Bucket {
         let index = self.bucket_index(timestamp);
-        std::mem::take(&mut self.buckets[index])
+        std::mem::take(
+            self.buckets
+                .get_mut(index)
+                .expect("Expected bucket at index"),
+        )
         // TODO handle error if index is outside bounds
     }
 
