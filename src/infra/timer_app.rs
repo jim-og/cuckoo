@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     core::{TimerService, TimerServiceEvent},
     infra::events::TimerServiceEventSource,
@@ -8,6 +6,7 @@ use crate::{
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use futures::StreamExt;
+use std::sync::Arc;
 use tokio::sync::oneshot;
 
 pub struct TimerApp<S: EventSource> {
@@ -25,7 +24,7 @@ impl TimerApp<TimerServiceEventSource> {
 
         // Setup publisher
 
-        let service = TimerService::new();
+        let service = TimerService::new(logger.clone());
 
         Ok(Self {
             service,

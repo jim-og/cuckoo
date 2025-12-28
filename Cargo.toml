@@ -17,3 +17,4 @@ hyper = { version = "1", features = ["full"] }
 http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["full"] }
 tower = { version = "0.4", features = ["util"] }
+tokio-stream = "0.1.17"

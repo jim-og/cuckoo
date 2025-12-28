@@ -20,3 +20,8 @@ POST http://127.0.0.1:3000/echo/reversed
     <name>sample</name>
     <time>Wed, 21 Oct 2015 18:27:50 GMT</time>
 </request>
+###
+PUT  http://127.0.0.1:3000/
+###
+DELETE  http://127.0.0.1:3000/
+###

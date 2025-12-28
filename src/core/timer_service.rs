@@ -1,6 +1,6 @@
 use crate::{
     core::{clock::SystemClock, store::Store},
-    utils::EventHandler,
+    utils::{EventHandler, Logger},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -8,34 +8,56 @@ use std::sync::Arc;
 
 pub struct TimerService {
     store: Store,
+    logger: Arc<dyn Logger>,
 }
 
 impl TimerService {
-    pub fn new(// publisher
+    pub fn new(
+        // publisher
         // config
-        // logger
+        logger: Arc<dyn Logger>,
     ) -> Self {
         let clock = Arc::new(SystemClock {});
         let store = Store::new(clock.clone());
-        Self { store }
+        Self { store, logger }
     }
 
-    async fn add_timer(&self) -> anyhow::Result<()> {
-        // TODO self.store.insert(timer);
-        println!("Add timer");
+    async fn get(&self) -> Result<()> {
+        // TODO self.store.get(timer);
+        self.logger.info("Get timer");
         Ok(())
     }
 
-    async fn delete_timer(&self) -> anyhow::Result<()> {
+    async fn add(&self) -> Result<()> {
+        // TODO self.store.insert(timer);
+        self.logger.info("Add timer");
+        Ok(())
+    }
+
+    async fn update(&self) -> Result<()> {
+        // TODO self.store.update(timer);
+        self.logger.info("Update timer");
+        Ok(())
+    }
+
+    async fn delete(&self) -> Result<()> {
         // TODO self.store.remove(id)
-        println!("Delete timer");
+        self.logger.info("Delete timer");
+        Ok(())
+    }
+
+    async fn unsupported(&self) -> Result<()> {
+        self.logger.info("Unsupported event");
         Ok(())
     }
 }
 
 pub enum TimerServiceEvent {
-    AddTimer,
-    DeleteTimer,
+    Get,
+    Add,
+    Update,
+    Delete,
+    Unsupported,
 }
 
 #[async_trait(?Send)]
@@ -44,8 +66,11 @@ impl EventHandler for TimerService {
 
     async fn handle_event(&mut self, event: Self::Event) -> Result<()> {
         match event {
-            TimerServiceEvent::AddTimer => self.add_timer().await,
-            TimerServiceEvent::DeleteTimer => self.delete_timer().await,
+            TimerServiceEvent::Get => self.get().await,
+            TimerServiceEvent::Add => self.add().await,
+            TimerServiceEvent::Update => self.update().await,
+            TimerServiceEvent::Delete => self.delete().await,
+            TimerServiceEvent::Unsupported => self.unsupported().await,
         }
     }
 }

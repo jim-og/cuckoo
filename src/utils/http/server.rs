@@ -1,27 +1,32 @@
+use crate::utils::Logger;
+use anyhow::Result;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty, Full};
 use hyper::body::{Body, Bytes, Frame, Incoming};
 use hyper::server::conn::http1;
+use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use hyper_util::service::TowerToHyperService;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::net::TcpListener;
+use tokio::sync::mpsc;
 use tower::{Service, ServiceBuilder};
 
 #[derive(Debug, Clone)]
-pub struct Logger<S> {
+pub struct ServiceLogger<S> {
     inner: S,
 }
-impl<S> Logger<S> {
+impl<S> ServiceLogger<S> {
     pub fn new(inner: S) -> Self {
-        Logger { inner }
+        ServiceLogger { inner }
     }
 }
 type Req = Request<Incoming>;
 
-impl<S> Service<Req> for Logger<S>
+impl<S> Service<Req> for ServiceLogger<S>
 where
     S: Service<Req> + Clone,
 {
@@ -50,7 +55,7 @@ async fn shutdown_signal() {
 }
 
 async fn echo(
-    req: Request<hyper::body::Incoming>,
+    req: Request<Incoming>,
 ) -> Result<Response<BoxBody<Bytes, hyper::Error>>, hyper::Error> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => Ok(Response::new(full("Try POSTing data to /echo"))),
@@ -94,6 +99,8 @@ async fn echo(
     }
 }
 
+pub type RequestSender = mpsc::Sender<Request<hyper::body::Incoming>>;
+
 /// Helper function to create an Empty body.
 fn empty() -> BoxBody<Bytes, hyper::Error> {
     Empty::new().map_err(|never| match never {}).boxed()
@@ -107,7 +114,7 @@ fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {
 }
 
 /// In the event of an error, returns a heap-allocatedw thread-safe error of any type that implements Error.
-pub async fn run_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn run_server_example() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Address of localhost on port 3000
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
 
@@ -133,7 +140,7 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>
                 // Create the service
                 let echo_svc = tower::service_fn(echo);
                 let tower_svc = ServiceBuilder::new()
-                    .layer_fn(Logger::new)
+                    .layer_fn(ServiceLogger::new)
                     .service(echo_svc);
                 let svc = TowerToHyperService::new(tower_svc);
 
@@ -170,4 +177,46 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>
     }
 
     Ok(())
+}
+
+pub async fn run_server(tx: RequestSender, logger: Arc<dyn Logger>) -> Result<()> {
+    // Address of localhost on port 3000
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+
+    // Create a TcpListener and bind it to 127.0.0.1:3000
+    let listener = TcpListener::bind(addr).await?;
+    logger.info(&format!("Listening on http://{}", addr));
+
+    // Create a HTTP connection builder
+    let http = http1::Builder::new();
+
+    // Start an event loop to continuously accept incoming connections
+    loop {
+        let (stream, _remote_addr) = match listener.accept().await {
+            Ok(conn) => conn,
+            Err(err) => {
+                logger.error(&format!("Accept error: {:?}", err));
+                continue;
+            }
+        };
+
+        let io = TokioIo::new(stream);
+        let tx = tx.clone();
+        let logger = logger.clone();
+        let http = http.clone();
+
+        tokio::spawn(async move {
+            let service = service_fn(move |req: Request<Incoming>| {
+                let tx = tx.clone();
+                async move {
+                    let _ = tx.send(req).await;
+                    Ok::<_, hyper::Error>(Response::new(full("OK")))
+                }
+            });
+
+            if let Err(err) = http.serve_connection(io, service).await {
+                logger.error(&format!("Connection error: {:?}", err));
+            }
+        });
+    }
 }

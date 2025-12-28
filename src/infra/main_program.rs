@@ -22,9 +22,15 @@ impl MainProgram {
 
     pub async fn run(&mut self) -> Result<()> {
         let (termination_sender, termination_receiver) = oneshot::channel();
-        let (readiness_sender, _) = oneshot::channel();
+        let (readiness_sender, readiness_receiver) = oneshot::channel();
 
         let _ = self.set_ctrlc_handler(termination_sender);
+
+        let logger = self.logger.clone();
+        tokio::spawn(async move {
+            let _ = readiness_receiver.await;
+            logger.info("Application is ready");
+        });
 
         self.run_inner(termination_receiver, readiness_sender).await
     }

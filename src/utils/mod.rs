@@ -8,6 +8,7 @@ mod event_source;
 pub use event_source::EventSource;
 
 mod http;
+pub use http::run_server;
 
 mod lifecycle;
 
