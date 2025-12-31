@@ -55,7 +55,7 @@ impl MainProgram {
 
     fn log_startup_banner(&self) -> anyhow::Result<()> {
         self.logger
-            .info(&format!("cuckoo - version {}\n", env!("CARGO_PKG_VERSION")));
+            .info(&format!("cuckoo - version {}", env!("CARGO_PKG_VERSION")));
         Ok(())
     }
 

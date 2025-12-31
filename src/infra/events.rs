@@ -1,10 +1,11 @@
 use crate::{
-    core::TimerServiceEvent,
+    core::{TimeT, Timer, TimerId, TimerServiceEvent},
     utils::{EventSource, Logger, run_server},
 };
 use anyhow::Result;
+use chrono::Utc;
 use futures::{Stream, StreamExt};
-use hyper::{Method, Request, body::Incoming, rt::Timer};
+use hyper::{Method, Request, body::Incoming};
 use std::{pin::Pin, sync::Arc};
 use tokio::sync::mpsc::{self, Sender};
 use tokio_stream::wrappers::ReceiverStream;
@@ -22,23 +23,24 @@ impl TimerServiceEventSource {
         // config
         logger: Arc<dyn Logger>,
     ) -> Result<Self> {
-        let (tx, rx) = mpsc::channel::<Request<Incoming>>(1024);
+        let (request_sender, request_receiver) = mpsc::channel::<Request<Incoming>>(1024);
 
         // Spawn server
-        tokio::spawn(run_server(tx.clone(), logger.clone()));
+        tokio::spawn(run_server(request_sender.clone(), logger.clone()));
 
         // Event mapper
-        let stream = ReceiverStream::new(rx).map(|req| match req.method() {
-            &Method::GET => TimerServiceEvent::Get,
-            &Method::POST => TimerServiceEvent::Add,
-            &Method::PUT => TimerServiceEvent::Update,
-            &Method::DELETE => TimerServiceEvent::Delete,
-            _ => TimerServiceEvent::Unsupported,
+        let stream = ReceiverStream::new(request_receiver).map(|req| match req.method() {
+            &Method::POST => {
+                let timer =
+                    Timer::new(TimerId::new(), Utc::now().timestamp_millis() as TimeT, 2000);
+                TimerServiceEvent::Insert(timer)
+            }
+            _ => panic!("HTTP method not supported"),
         });
 
         Ok(Self {
             event_stream: Some(Box::pin(stream)),
-            _sender: tx,
+            _sender: request_sender,
         })
     }
 }

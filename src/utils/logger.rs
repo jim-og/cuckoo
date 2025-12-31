@@ -1,3 +1,5 @@
+use chrono::Utc;
+
 #[derive(Debug, Clone, Copy)]
 pub enum LogLevel {
     Debug,
@@ -27,6 +29,7 @@ pub struct StdoutLogger;
 
 impl Logger for StdoutLogger {
     fn log(&self, level: LogLevel, message: &str) {
-        println!("[{:?}] {}", level, message);
+        let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S%.3f");
+        println!("[{}] {:?}: {}", timestamp, level, message);
     }
 }

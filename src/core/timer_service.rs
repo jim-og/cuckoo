@@ -1,63 +1,75 @@
 use crate::{
-    core::{clock::SystemClock, store::Store},
+    core::{
+        clock::SystemClock,
+        store::Store,
+        timer::{Timer, TimerId},
+    },
     utils::{EventHandler, Logger},
 };
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
+use tokio::{
+    sync::mpsc::{self, Sender},
+    time::{Duration, Instant, sleep_until},
+};
 
 pub struct TimerService {
-    store: Store,
-    logger: Arc<dyn Logger>,
+    event_sender: mpsc::Sender<TimerServiceEvent>,
 }
 
 impl TimerService {
-    pub fn new(
-        // publisher
-        // config
-        logger: Arc<dyn Logger>,
-    ) -> Self {
+    pub fn new(timer_sender: Sender<Timer>, logger: Arc<dyn Logger>) -> Self {
         let clock = Arc::new(SystemClock {});
         let store = Store::new(clock.clone());
-        Self { store, logger }
+        let (event_sender, event_receiver) = mpsc::channel::<TimerServiceEvent>(1024);
+
+        tokio::spawn(Self::run(store, event_receiver, timer_sender, logger));
+
+        Self { event_sender }
     }
 
-    async fn get(&self) -> Result<()> {
-        // TODO self.store.get(timer);
-        self.logger.info("Get timer");
-        Ok(())
-    }
+    pub async fn run(
+        mut store: Store,
+        mut event_receiver: mpsc::Receiver<TimerServiceEvent>,
+        timer_sender: mpsc::Sender<Timer>,
+        logger: Arc<dyn Logger>,
+    ) {
+        loop {
+            // TODO get deadline from store
+            let next_deadline = Some(Instant::now() + Duration::from_millis(2));
 
-    async fn add(&self) -> Result<()> {
-        // TODO self.store.insert(timer);
-        self.logger.info("Add timer");
-        Ok(())
-    }
-
-    async fn update(&self) -> Result<()> {
-        // TODO self.store.update(timer);
-        self.logger.info("Update timer");
-        Ok(())
-    }
-
-    async fn delete(&self) -> Result<()> {
-        // TODO self.store.remove(id)
-        self.logger.info("Delete timer");
-        Ok(())
-    }
-
-    async fn unsupported(&self) -> Result<()> {
-        self.logger.info("Unsupported event");
-        Ok(())
+            tokio::select! {
+                // New event arrived
+                Some(event) = event_receiver.recv() => {
+                    logger.info("new event arrived");
+                    match event {
+                        TimerServiceEvent::Insert(timer) => store.insert(timer),
+                    }
+                }
+                // Timer fired
+                _ = async {
+                    if let Some(deadline) = next_deadline {
+                        sleep_until(deadline).await;
+                    } else {
+                        futures::future::pending::<()>().await;
+                    }
+                } => {
+                    let bucket = store.pop();
+                    for timer in bucket {
+                        logger.info("timer popped");
+                        let _ = timer_sender.send(timer).await;
+                    }
+                }
+                // TODO shutdown signal
+                // _ = &mut self.shutdown => break,
+            }
+        }
     }
 }
 
 pub enum TimerServiceEvent {
-    Get,
-    Add,
-    Update,
-    Delete,
-    Unsupported,
+    Insert(Timer),
 }
 
 #[async_trait(?Send)]
@@ -65,12 +77,8 @@ impl EventHandler for TimerService {
     type Event = TimerServiceEvent;
 
     async fn handle_event(&mut self, event: Self::Event) -> Result<()> {
-        match event {
-            TimerServiceEvent::Get => self.get().await,
-            TimerServiceEvent::Add => self.add().await,
-            TimerServiceEvent::Update => self.update().await,
-            TimerServiceEvent::Delete => self.delete().await,
-            TimerServiceEvent::Unsupported => self.unsupported().await,
-        }
+        // TODO handle error
+        let _ = self.event_sender.send(event).await;
+        Ok(())
     }
 }

@@ -39,6 +39,7 @@ impl Store {
             .insert(timer.id.clone(), timer.clone())
             .is_some()
         {
+            // TODO handle error
             panic!("A timer already exists with this ID.");
         }
 

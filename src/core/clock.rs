@@ -3,7 +3,7 @@ use chrono::Utc;
 /// The 64-bit unsigned integer type used to store time in ms.
 pub type TimeT = usize;
 
-pub trait Clock {
+pub trait Clock: Send + Sync {
     fn now(&self) -> TimeT;
 }
 
