@@ -190,33 +190,54 @@ pub async fn run_server(tx: RequestSender, logger: Arc<dyn Logger>) -> Result<()
     // Create a HTTP connection builder
     let http = http1::Builder::new();
 
+    // Create a graceful shutdown watcher
+    let graceful = GracefulShutdown::new();
+
+    // Create a watcher for the shutdown signal to complete
+    let mut signal = std::pin::pin!(shutdown_signal());
+
     // Start an event loop to continuously accept incoming connections
     loop {
-        let (stream, _remote_addr) = match listener.accept().await {
-            Ok(conn) => conn,
-            Err(err) => {
-                logger.error(&format!("Accept error: {:?}", err));
-                continue;
-            }
-        };
-
-        let io = TokioIo::new(stream);
-        let tx = tx.clone();
-        let logger = logger.clone();
-        let http = http.clone();
-
-        tokio::spawn(async move {
-            let service = service_fn(move |req: Request<Incoming>| {
+        tokio::select! {
+            Ok((stream, _remote_addr)) = listener.accept() => {
+                let io = TokioIo::new(stream);
                 let tx = tx.clone();
-                async move {
-                    let _ = tx.send(req).await;
-                    Ok::<_, hyper::Error>(Response::new(full("OK")))
-                }
-            });
+                let logger = logger.clone();
+                let http = http.clone();
 
-            if let Err(err) = http.serve_connection(io, service).await {
-                logger.error(&format!("Connection error: {:?}", err));
+                tokio::spawn(async move {
+                    let service = service_fn(move |req: Request<Incoming>| {
+                        let tx = tx.clone();
+                        async move {
+                            let _ = tx.send(req).await;
+                            Ok::<_, hyper::Error>(Response::new(full("OK")))
+                        }
+                    });
+
+                    if let Err(err) = http.serve_connection(io, service).await {
+                        logger.error(&format!("Connection error: {:?}", err));
+                    }
+                });
+            },
+            _ = &mut signal => {
+                // Shutdown signal completed, stop the accept event loop
+                drop(listener);
+                logger.info("Graceful shutdown signal received");
+                break;
             }
-        });
+        }
     }
+
+    // Start the shutdown procedure and wait for all connection to complete
+    // with a timeout to limit how long to wait.
+    tokio::select! {
+        _ = graceful.shutdown() => {
+            logger.info("All connections gracefully closed");
+        },
+        _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
+            logger.error("Timed out waiting for all connections to close");
+        }
+    }
+
+    Ok(())
 }
