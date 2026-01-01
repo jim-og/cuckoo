@@ -1,4 +1,4 @@
-use crate::{clock::TimeT, timer::Timer};
+use crate::core::{clock::TimeT, timer::Timer};
 use std::collections::{BinaryHeap, HashSet};
 
 pub const SHORT_WHEEL_NUM_BUCKETS: usize = 128;

@@ -1,4 +1,4 @@
-use crate::clock::TimeT;
+use crate::core::clock::TimeT;
 use std::cmp::Ordering;
 use uuid::Uuid;
 
@@ -13,6 +13,12 @@ impl TimerId {
 
     pub fn uuid(&self) -> Uuid {
         self.0
+    }
+}
+
+impl Default for TimerId {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
