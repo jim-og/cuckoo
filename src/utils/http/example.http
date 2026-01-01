@@ -1,33 +1,6 @@
-GET http://127.0.0.1:3000/
-###
-POST http://127.0.0.1:3000/echo
-
-<request>
-    <name>sample</name>
-    <time>Wed, 21 Oct 2015 18:27:50 GMT</time>
-</request>
-###
-POST http://127.0.0.1:3000/echo/uppercase
-
-<request>
-    <name>sample</name>
-    <time>Wed, 21 Oct 2015 18:27:50 GMT</time>
-</request>
-###
-POST http://127.0.0.1:3000/echo/reversed
-
-<request>
-    <name>sample</name>
-    <time>Wed, 21 Oct 2015 18:27:50 GMT</time>
-</request>
-###
 POST  http://127.0.0.1:3000/
 
 {
     "interval_ms": 5000
 }
-###
-PUT  http://127.0.0.1:3000/
-###
-DELETE  http://127.0.0.1:3000/
 ###

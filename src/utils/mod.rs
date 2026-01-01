@@ -10,7 +10,5 @@ pub use event_source::EventSource;
 mod http;
 pub use http::{HttpRequest, run_server};
 
-mod lifecycle;
-
 mod logger;
 pub use logger::{Logger, StdoutLogger};

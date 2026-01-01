@@ -16,6 +16,12 @@ impl TimerId {
     }
 }
 
+impl Default for TimerId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Timer {
     pub id: TimerId,
