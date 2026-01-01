@@ -1,4 +1,4 @@
 mod client;
 
 mod server;
-pub use server::run_server;
+pub use server::{HttpRequest, run_server};

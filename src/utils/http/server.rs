@@ -99,7 +99,13 @@ async fn echo(
     }
 }
 
-pub type RequestSender = mpsc::Sender<Request<hyper::body::Incoming>>;
+pub struct HttpRequest {
+    pub method: http::Method,
+    pub path: String,
+    pub body: Bytes,
+}
+
+pub type RequestSender = mpsc::Sender<HttpRequest>;
 
 /// Helper function to create an Empty body.
 fn empty() -> BoxBody<Bytes, hyper::Error> {
@@ -209,7 +215,22 @@ pub async fn run_server(tx: RequestSender, logger: Arc<dyn Logger>) -> Result<()
                     let service = service_fn(move |req: Request<Incoming>| {
                         let tx = tx.clone();
                         async move {
-                            let _ = tx.send(req).await;
+                            // Set an upper bound of 64kb for body size
+                            let upper_bound = req.body().size_hint().upper().unwrap_or(u64::MAX);
+                            if upper_bound > 1024 * 64 {
+                                let mut resp = Response::new(full("Body too big"));
+                                *resp.status_mut() = StatusCode::PAYLOAD_TOO_LARGE;
+                                return Ok(resp);
+                            }
+
+                            // Await the whole body to be collected
+                            let request = HttpRequest {
+                                method: req.method().clone(),
+                                path: req.uri().path().to_string(),
+                                body: req.collect().await?.to_bytes()
+                            };
+
+                            let _ = tx.send(request).await;
                             Ok::<_, hyper::Error>(Response::new(full("OK")))
                         }
                     });

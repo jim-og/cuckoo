@@ -1,11 +1,12 @@
 use crate::{
     core::{TimeT, Timer, TimerId, TimerServiceEvent},
-    utils::{EventSource, Logger, run_server},
+    utils::{EventSource, HttpRequest, Logger, run_server},
 };
 use anyhow::Result;
 use chrono::Utc;
 use futures::{Stream, StreamExt};
-use hyper::{Method, Request, body::Incoming};
+use hyper::Method;
+use serde::Deserialize;
 use std::{pin::Pin, sync::Arc};
 use tokio::sync::mpsc::{self, Sender};
 use tokio_stream::wrappers::ReceiverStream;
@@ -15,27 +16,42 @@ pub type TimerServiceEventStream = EventStream<TimerServiceEvent>;
 
 pub struct TimerServiceEventSource {
     event_stream: Option<TimerServiceEventStream>,
-    _sender: Sender<Request<Incoming>>, // keep sender alive
+    _sender: Sender<HttpRequest>, // keep sender alive
+}
+
+#[derive(Deserialize)]
+struct RequestPayload {
+    interval_ms: usize,
 }
 
 impl TimerServiceEventSource {
-    pub async fn new(
-        // config
-        logger: Arc<dyn Logger>,
-    ) -> Result<Self> {
-        let (request_sender, request_receiver) = mpsc::channel::<Request<Incoming>>(1024);
+    pub async fn new(logger: Arc<dyn Logger>) -> Result<Self> {
+        let (request_sender, request_receiver) = mpsc::channel::<HttpRequest>(1024);
 
         // Spawn server
         tokio::spawn(run_server(request_sender.clone(), logger.clone()));
 
         // Event mapper
-        let stream = ReceiverStream::new(request_receiver).map(|req| match req.method() {
-            &Method::POST => {
-                let timer =
-                    Timer::new(TimerId::new(), Utc::now().timestamp_millis() as TimeT, 2000);
-                TimerServiceEvent::Insert(timer)
+        let stream = ReceiverStream::new(request_receiver).map(|req| {
+            match (req.method, req.path.as_str()) {
+                (Method::POST, "/") => {
+                    if let Ok(payload) = serde_json::from_slice::<RequestPayload>(&req.body) {
+                        // TODO move timestamp to earliest point
+                        let timer = Timer::new(
+                            TimerId::new(),
+                            Utc::now().timestamp_millis() as TimeT,
+                            payload.interval_ms,
+                        );
+                        TimerServiceEvent::Insert(timer)
+                    } else {
+                        // TODO handle error
+                        println!("{:?}", req.body);
+                        panic!("Failed to extract payload")
+                    }
+                }
+                // TODO handle error
+                _ => panic!("HTTP method not supported"),
             }
-            _ => panic!("HTTP method not supported"),
         });
 
         Ok(Self {

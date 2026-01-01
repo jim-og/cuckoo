@@ -1,9 +1,5 @@
 use crate::{
-    core::{
-        clock::SystemClock,
-        store::Store,
-        timer::{Timer, TimerId},
-    },
+    core::{clock::SystemClock, store::Store, timer::Timer},
     utils::{EventHandler, Logger},
 };
 use anyhow::Result;
@@ -57,7 +53,6 @@ impl TimerService {
                 } => {
                     let bucket = store.pop();
                     for timer in bucket {
-                        logger.info("timer popped");
                         let _ = timer_sender.send(timer).await;
                     }
                 }

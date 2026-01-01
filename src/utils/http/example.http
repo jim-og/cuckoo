@@ -22,6 +22,10 @@ POST http://127.0.0.1:3000/echo/reversed
 </request>
 ###
 POST  http://127.0.0.1:3000/
+
+{
+    "interval_ms": 5000
+}
 ###
 PUT  http://127.0.0.1:3000/
 ###

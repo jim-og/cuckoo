@@ -20,10 +20,7 @@ pub struct TimerApp<S: EventSource> {
 }
 
 impl TimerApp<TimerServiceEventSource> {
-    pub async fn new(
-        // config
-        logger: Arc<dyn Logger>,
-    ) -> Result<Self> {
+    pub async fn new(logger: Arc<dyn Logger>) -> Result<Self> {
         let event_source = TimerServiceEventSource::new(logger.clone()).await?;
 
         // Setup publisher
