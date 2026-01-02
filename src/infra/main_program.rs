@@ -77,6 +77,7 @@ impl MainProgram {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
