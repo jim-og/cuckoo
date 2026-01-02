@@ -11,7 +11,7 @@ use std::{pin::Pin, sync::Arc};
 use tokio::sync::mpsc::{self, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 
-pub type EventStream<T> = Pin<Box<dyn Stream<Item = T>>>;
+pub type EventStream<T> = Pin<Box<dyn Stream<Item = T> + Send + 'static>>;
 pub type TimerServiceEventStream = EventStream<TimerServiceEvent>;
 
 pub struct TimerServiceEventSource {
