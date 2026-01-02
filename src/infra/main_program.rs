@@ -1,22 +1,18 @@
 use crate::{
     infra::timer_app::TimerApp,
-    utils::{App, Logger, StdoutLogger},
+    utils::{Logger, StdoutLogger},
 };
 use anyhow::{Context, Result};
 use std::{cell::Cell, sync::Arc};
 use tokio::sync::oneshot;
 
 pub struct MainProgram {
-    // TODO config
     logger: Arc<dyn Logger>,
 }
 
 impl MainProgram {
     pub async fn new() -> Result<Self> {
-        // load config
-
         let logger = Arc::new(StdoutLogger);
-
         Ok(Self { logger })
     }
 

@@ -1,6 +1,6 @@
 use crate::{
     core::{TimeT, Timer, TimerId, TimerServiceEvent},
-    utils::{EventSource, HttpRequest, Logger, run_server},
+    utils::{HttpRequest, Logger, run_server},
 };
 use anyhow::Result;
 use chrono::Utc;
@@ -59,16 +59,11 @@ impl TimerServiceEventSource {
             _sender: request_sender,
         })
     }
-}
 
-impl EventSource for TimerServiceEventSource {
-    type Event = TimerServiceEvent;
-    type EventStream = TimerServiceEventStream;
-
-    fn take_stream(
+    pub fn take_stream(
         &mut self,
         termination: tokio::sync::oneshot::Receiver<()>,
-    ) -> Option<Self::EventStream> {
+    ) -> Option<TimerServiceEventStream> {
         let stream = self.event_stream.take()?;
         Some(Box::pin(stream.take_until(async move {
             let _ = termination.await;
