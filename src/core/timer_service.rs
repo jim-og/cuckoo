@@ -1,14 +1,17 @@
 use crate::{
     core::{clock::SystemClock, store::Store, timer::Timer},
-    utils::{EventHandler, Logger},
+    utils::Logger,
 };
 use anyhow::Result;
-use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::{
     sync::mpsc::{self, Sender},
     time::{Duration, Instant, sleep_until},
 };
+
+pub enum TimerServiceEvent {
+    Insert(Timer),
+}
 
 pub struct TimerService {
     event_sender: mpsc::Sender<TimerServiceEvent>,
@@ -61,17 +64,8 @@ impl TimerService {
             }
         }
     }
-}
 
-pub enum TimerServiceEvent {
-    Insert(Timer),
-}
-
-#[async_trait(?Send)]
-impl EventHandler for TimerService {
-    type Event = TimerServiceEvent;
-
-    async fn handle_event(&mut self, event: Self::Event) -> Result<()> {
+    pub async fn handle_event(&mut self, event: TimerServiceEvent) -> Result<()> {
         // TODO handle error
         let _ = self.event_sender.send(event).await;
         Ok(())
