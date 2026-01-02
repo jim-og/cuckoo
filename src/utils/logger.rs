@@ -79,6 +79,12 @@ impl StdoutLogger {
     }
 }
 
+impl Default for StdoutLogger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Logger for StdoutLogger {
     fn log(&self, level: LogLevel, message: &str) {
         let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S%.3f");
@@ -94,4 +100,39 @@ impl Logger for StdoutLogger {
             });
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn logger_contains_returns_true() {
+        let logger = StdoutLogger::new().with_receiver();
+
+        logger.debug("foo");
+        logger.info("bar");
+        logger.warn("baz");
+        logger.error("qux");
+
+        assert!(
+            logger.contains("Debug").await,
+            "Logger should contain 'Debug'"
+        );
+        assert!(
+            logger.contains("Info").await,
+            "Logger should contain 'Info'"
+        );
+        assert!(
+            logger.contains("Warn").await,
+            "Logger should contain 'Warn'"
+        );
+        assert!(
+            logger.contains("Error").await,
+            "Logger should contain 'Error'"
+        );
+    }
+
+    // TODO timeout
+    // TODO channel close
 }
