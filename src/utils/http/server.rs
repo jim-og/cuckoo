@@ -117,10 +117,8 @@ pub async fn run_server(
                         handle_request(req, request_sender)
                     });
 
-                    let connection = http.serve_connection(io, service);
-
-                    // Apply a timeout to the connection
-                    match timeout(request_timeout, connection).await {
+                    // Wrap the connection in a timeout
+                    match timeout(request_timeout, http.serve_connection(io, service)).await {
                         Ok(Ok(_)) => {
                             // Connection completed successfully
                         },
@@ -307,7 +305,7 @@ mod tests {
 
         // Drip feed the body
         for _ in 0..100 {
-            let _ = stream.write_all(&[b'a']).await;
+            let _ = stream.write_all(b"a").await;
             stream.flush().await?;
             sleep(Duration::from_millis(100)).await; // 10 seconds total for 100 bytes
         }
@@ -334,7 +332,7 @@ mod tests {
 
         // Drip feed the body
         for _ in 0..100 {
-            let _ = stream.write_all(&[b'a']).await;
+            let _ = stream.write_all(b"a").await;
             stream.flush().await?;
             sleep(Duration::from_millis(45)).await; // 4.5 seconds total for 100 bytes
         }
