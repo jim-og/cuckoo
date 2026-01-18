@@ -128,7 +128,7 @@ pub async fn run_server(
                             logger.error(&format!("Connection error: {:?}", err));
                         }
                         Err(_) => {
-                            logger.error(&format!("Connection timed out"));
+                            logger.error("Connection timed out");
                         },
                     }
                 });
