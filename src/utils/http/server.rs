@@ -1,8 +1,8 @@
 use crate::utils::Logger;
 use anyhow::Result;
 use http_body_util::combinators::BoxBody;
-use http_body_util::{BodyExt, Empty, Full};
-use hyper::body::{Body, Bytes, Incoming};
+use http_body_util::{BodyExt, Empty, Full, Limited};
+use hyper::body::{Bytes, Incoming};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
@@ -44,20 +44,23 @@ pub async fn handle_request(
     req: Request<Incoming>,
     request_sender: RequestSender,
 ) -> Result<Response<BoxBody<Bytes, hyper::Error>>, hyper::Error> {
+    let method = req.method().clone();
+    let path = req.uri().path().to_string();
+
     // Set an upper bound of 64kb for body size
-    let upper_bound = req.body().size_hint().upper().unwrap_or(u64::MAX);
-    if upper_bound > 1024 * 64 {
-        let mut resp = Response::new(full("Body too big"));
-        *resp.status_mut() = StatusCode::PAYLOAD_TOO_LARGE;
-        return Ok(resp);
-    }
+    let limited_body = Limited::new(req.into_body(), 1024 * 64);
 
     // Await the whole body to be collected
-    let request = HttpRequest {
-        method: req.method().clone(),
-        path: req.uri().path().to_string(),
-        body: req.collect().await?.to_bytes(),
+    let body = match limited_body.collect().await {
+        Ok(collected_body) => collected_body.to_bytes(),
+        Err(_) => {
+            let mut resp = Response::new(full("Body too big"));
+            *resp.status_mut() = StatusCode::PAYLOAD_TOO_LARGE;
+            return Ok(resp);
+        }
     };
+
+    let request = HttpRequest { method, path, body };
 
     let _ = request_sender.send(request).await;
     Ok::<_, hyper::Error>(Response::new(full("OK")))
