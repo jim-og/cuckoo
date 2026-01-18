@@ -8,7 +8,10 @@ use futures::{Stream, StreamExt};
 use hyper::Method;
 use serde::Deserialize;
 use std::{pin::Pin, sync::Arc};
-use tokio::sync::mpsc::{self, Sender};
+use tokio::sync::{
+    mpsc::{self, Sender},
+    oneshot,
+};
 use tokio_stream::wrappers::ReceiverStream;
 
 pub type EventStream<T> = Pin<Box<dyn Stream<Item = T> + Send + 'static>>;
@@ -29,7 +32,16 @@ impl TimerServiceEventSource {
         let (request_sender, request_receiver) = mpsc::channel::<HttpRequest>(1024);
 
         // Spawn server
-        tokio::spawn(run_server(request_sender.clone(), logger.clone()));
+        let (ready_sender, ready_receiver) = oneshot::channel();
+        tokio::spawn(run_server(
+            request_sender.clone(),
+            logger.clone(),
+            3000,
+            ready_sender,
+        ));
+
+        // Wait for the server to be ready
+        ready_receiver.await?;
 
         // Event mapper
         let stream = ReceiverStream::new(request_receiver).map(|req| {
