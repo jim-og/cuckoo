@@ -10,8 +10,10 @@ use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::{mpsc, oneshot};
+use tokio::time::timeout;
 
 async fn shutdown_signal() {
     // Wait for the CTRL+C signal
@@ -97,6 +99,9 @@ pub async fn run_server(
     // Create a watcher for the shutdown signal to complete
     let mut signal = std::pin::pin!(shutdown_signal());
 
+    // Request timeout to prevent slowloris attacks
+    let request_timeout = Duration::from_secs(5);
+
     // Start an event loop to continuously accept incoming connections
     loop {
         tokio::select! {
@@ -112,8 +117,19 @@ pub async fn run_server(
                         handle_request(req, request_sender)
                     });
 
-                    if let Err(err) = http.serve_connection(io, service).await {
-                        logger.error(&format!("Connection error: {:?}", err));
+                    let connection = http.serve_connection(io, service);
+
+                    // Apply a timeout to the connection
+                    match timeout(request_timeout, connection).await {
+                        Ok(Ok(_)) => {
+                            // Connection completed successfully
+                        },
+                        Ok(Err(err)) => {
+                            logger.error(&format!("Connection error: {:?}", err));
+                        }
+                        Err(_) => {
+                            logger.error(&format!("Connection timed out"));
+                        },
                     }
                 });
             },
@@ -146,7 +162,9 @@ mod tests {
     use crate::utils::StdoutLogger;
     use http::Method;
     use std::sync::atomic::{AtomicU16, Ordering};
-    use tokio::sync::mpsc::error::TryRecvError;
+    use tokio::io::AsyncReadExt;
+    use tokio::time::{Duration, resume, sleep};
+    use tokio::{io::AsyncWriteExt, net::TcpStream, sync::mpsc::error::TryRecvError};
 
     struct TestServerHarness {
         port: u16,
@@ -273,6 +291,61 @@ mod tests {
 
         assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
         assert!(harness.try_recv().is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn slowloris_request_rejected() -> Result<()> {
+        let harness = TestServerHarness::new().await;
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", harness.port)).await?;
+
+        stream
+            .write_all(b"POST /timer HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\n")
+            .await?;
+        stream.flush().await?;
+
+        // Drip feed the body
+        for _ in 0..100 {
+            let _ = stream.write_all(&[b'a']).await;
+            stream.flush().await?;
+            sleep(Duration::from_millis(100)).await; // 10 seconds total for 100 bytes
+        }
+
+        resume();
+
+        let mut response = vec![0u8; 1024];
+        let result = stream.read(&mut response).await;
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn timely_request_succeeds() -> Result<()> {
+        let harness = TestServerHarness::new().await;
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", harness.port)).await?;
+
+        stream
+            .write_all(b"POST /timer HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\n")
+            .await?;
+        stream.flush().await?;
+
+        // Drip feed the body
+        for _ in 0..100 {
+            let _ = stream.write_all(&[b'a']).await;
+            stream.flush().await?;
+            sleep(Duration::from_millis(45)).await; // 4.5 seconds total for 100 bytes
+        }
+
+        resume();
+
+        let mut response = vec![0u8; 1024];
+        let n = stream.read(&mut response).await.unwrap();
+        let resp = String::from_utf8_lossy(&response[..n]);
+
+        assert!(resp.contains("200 OK"));
 
         Ok(())
     }
