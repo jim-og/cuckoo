@@ -1,7 +1,7 @@
 use crate::utils::Logger;
 use anyhow::Result;
 use http_body_util::combinators::BoxBody;
-use http_body_util::{BodyExt, Empty, Full, Limited};
+use http_body_util::{BodyExt, Full, Limited};
 use hyper::body::{Bytes, Incoming};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
@@ -15,13 +15,6 @@ use tokio::net::TcpListener;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::timeout;
 
-async fn shutdown_signal() {
-    // Wait for the CTRL+C signal
-    tokio::signal::ctrl_c()
-        .await
-        .expect("failed to install CTRL+C signal handler");
-}
-
 pub struct HttpRequest {
     pub method: http::Method,
     pub path: String,
@@ -29,11 +22,6 @@ pub struct HttpRequest {
 }
 
 pub type RequestSender = mpsc::Sender<HttpRequest>;
-
-/// Helper function to create an Empty body.
-fn _empty() -> BoxBody<Bytes, hyper::Error> {
-    Empty::new().map_err(|never| match never {}).boxed()
-}
 
 /// Helper function to create a Full body.
 fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {
@@ -88,12 +76,16 @@ pub async fn handle_request(
 /// and handles requests using a Tower-compatible service. Incoming requests
 /// are decoded and forwarded over an asynchronous channel to the rest of the
 /// application for processing (for example, creating or managing timers).
-pub async fn run_server(
+pub async fn run_server<F>(
     request_sender: RequestSender,
     logger: Arc<dyn Logger>,
     port: u16,
     ready_sender: oneshot::Sender<()>,
-) -> Result<()> {
+    shutdown_signal: F,
+) -> Result<()>
+where
+    F: Future<Output = ()> + Send + 'static,
+{
     // Address of localhost on port 3000
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
@@ -111,7 +103,7 @@ pub async fn run_server(
     let graceful = Arc::new(GracefulShutdown::new());
 
     // Create a watcher for the shutdown signal to complete
-    let mut signal = std::pin::pin!(shutdown_signal());
+    let mut signal = std::pin::pin!(shutdown_signal);
 
     // Start an event loop to continuously accept incoming connections
     loop {
@@ -176,10 +168,15 @@ mod tests {
     use tokio::time::{Duration, advance, sleep};
     use tokio::{io::AsyncWriteExt, net::TcpStream, sync::mpsc::error::TryRecvError};
 
+    async fn shutdown_signal_testable(shutdown_receiver: oneshot::Receiver<()>) {
+        let _ = shutdown_receiver.await;
+    }
+
     struct TestServerHarness {
         port: u16,
         client: reqwest::Client,
         request_receiver: mpsc::Receiver<HttpRequest>,
+        shutdown_sender: oneshot::Sender<()>,
     }
 
     impl TestServerHarness {
@@ -192,12 +189,19 @@ mod tests {
             let (ready_sender, ready_receiver) = oneshot::channel();
             let logger = Arc::new(StdoutLogger::new().with_receiver());
             let server_logger = logger.clone();
+            let (shutdown_sender, shutdown_receiver) = oneshot::channel();
 
             // Spawn server
             tokio::spawn(async move {
-                run_server(request_sender, server_logger, port, ready_sender)
-                    .await
-                    .unwrap()
+                run_server(
+                    request_sender,
+                    server_logger,
+                    port,
+                    ready_sender,
+                    shutdown_signal_testable(shutdown_receiver),
+                )
+                .await
+                .unwrap()
             });
 
             // Wait for the server to be ready
@@ -207,6 +211,7 @@ mod tests {
                 port,
                 client: reqwest::Client::new(),
                 request_receiver,
+                shutdown_sender,
             }
         }
 
@@ -311,6 +316,7 @@ mod tests {
             port,
             client,
             request_receiver,
+            shutdown_sender: _shutdown_sender,
         } = TestServerHarness::new().await;
 
         // Drop the request receiver to simulate downstream failure
