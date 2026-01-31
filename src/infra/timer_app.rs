@@ -1,10 +1,9 @@
 use crate::{
-    core::{Timer, TimerService, TimerServiceEvent},
+    core::{Timer, TimerService},
     infra::events::TimerServiceEventSource,
-    utils::{App, EventHandler, EventSource, Logger},
+    utils::Logger,
 };
 use anyhow::{Context, Result};
-use async_trait::async_trait;
 use futures::StreamExt;
 use std::sync::Arc;
 use tokio::sync::{
@@ -12,14 +11,14 @@ use tokio::sync::{
     oneshot,
 };
 
-pub struct TimerApp<S: EventSource> {
+pub struct TimerApp {
     service: TimerService,
-    event_source: S,
+    event_source: TimerServiceEventSource,
     timer_receiver: Receiver<Timer>,
     logger: Arc<dyn Logger>,
 }
 
-impl TimerApp<TimerServiceEventSource> {
+impl TimerApp {
     pub async fn new(logger: Arc<dyn Logger>) -> Result<Self> {
         let event_source = TimerServiceEventSource::new(logger.clone()).await?;
 
@@ -35,14 +34,8 @@ impl TimerApp<TimerServiceEventSource> {
             logger,
         })
     }
-}
 
-#[async_trait(?Send)]
-impl<S> App for TimerApp<S>
-where
-    S: EventSource<Event = TimerServiceEvent>,
-{
-    async fn run(
+    pub async fn run(
         &mut self,
         termination_receiver: oneshot::Receiver<()>,
         readiness_sender: oneshot::Sender<()>,

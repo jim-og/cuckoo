@@ -1,6 +1,6 @@
 use crate::{
     core::{TimeT, Timer, TimerId, TimerServiceEvent},
-    utils::{EventSource, HttpRequest, Logger, run_server},
+    utils::{HttpRequest, Logger, run_server},
 };
 use anyhow::Result;
 use chrono::Utc;
@@ -8,10 +8,13 @@ use futures::{Stream, StreamExt};
 use hyper::Method;
 use serde::Deserialize;
 use std::{pin::Pin, sync::Arc};
-use tokio::sync::mpsc::{self, Sender};
+use tokio::sync::{
+    mpsc::{self, Sender},
+    oneshot,
+};
 use tokio_stream::wrappers::ReceiverStream;
 
-pub type EventStream<T> = Pin<Box<dyn Stream<Item = T>>>;
+pub type EventStream<T> = Pin<Box<dyn Stream<Item = T> + Send + 'static>>;
 pub type TimerServiceEventStream = EventStream<TimerServiceEvent>;
 
 pub struct TimerServiceEventSource {
@@ -29,7 +32,16 @@ impl TimerServiceEventSource {
         let (request_sender, request_receiver) = mpsc::channel::<HttpRequest>(1024);
 
         // Spawn server
-        tokio::spawn(run_server(request_sender.clone(), logger.clone()));
+        let (ready_sender, ready_receiver) = oneshot::channel();
+        tokio::spawn(run_server(
+            request_sender.clone(),
+            logger.clone(),
+            3000,
+            ready_sender,
+        ));
+
+        // Wait for the server to be ready
+        ready_receiver.await?;
 
         // Event mapper
         let stream = ReceiverStream::new(request_receiver).map(|req| {
@@ -59,16 +71,11 @@ impl TimerServiceEventSource {
             _sender: request_sender,
         })
     }
-}
 
-impl EventSource for TimerServiceEventSource {
-    type Event = TimerServiceEvent;
-    type EventStream = TimerServiceEventStream;
-
-    fn take_stream(
+    pub fn take_stream(
         &mut self,
         termination: tokio::sync::oneshot::Receiver<()>,
-    ) -> Option<Self::EventStream> {
+    ) -> Option<TimerServiceEventStream> {
         let stream = self.event_stream.take()?;
         Some(Box::pin(stream.take_until(async move {
             let _ = termination.await;
