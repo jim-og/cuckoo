@@ -72,7 +72,13 @@ pub async fn handle_request(
 
     let request = HttpRequest { method, path, body };
 
-    let _ = request_sender.send(request).await;
+    // Attempt to process the request. Respond with 503 if overloaded.
+    if let Err(err) = request_sender.send(request).await {
+        let mut resp = Response::new(full(err.to_string()));
+        *resp.status_mut() = StatusCode::SERVICE_UNAVAILABLE;
+        return Ok(resp);
+    }
+
     Ok::<_, hyper::Error>(Response::new(full("OK")))
 }
 
