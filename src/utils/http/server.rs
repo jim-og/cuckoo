@@ -173,7 +173,7 @@ mod tests {
     use http::Method;
     use std::sync::atomic::{AtomicU16, Ordering};
     use tokio::io::AsyncReadExt;
-    use tokio::time::{Duration, resume, sleep};
+    use tokio::time::{Duration, advance, sleep};
     use tokio::{io::AsyncWriteExt, net::TcpStream, sync::mpsc::error::TryRecvError};
 
     struct TestServerHarness {
@@ -305,9 +305,31 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn overloaded_server_returns_service_unavailable() -> Result<()> {
+        let TestServerHarness {
+            port,
+            client,
+            request_receiver,
+        } = TestServerHarness::new().await;
+
+        // Drop the request receiver to simulate downstream failure
+        drop(request_receiver);
+
+        let resp = client
+            .post(format!("http://127.0.0.1:{}/timer", port))
+            .body("hello")
+            .send()
+            .await?;
+
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+        Ok(())
+    }
+
     #[tokio::test(start_paused = true)]
     async fn slowloris_request_rejected() -> Result<()> {
-        let harness = TestServerHarness::new().await;
+        let mut harness = TestServerHarness::new().await;
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", harness.port)).await?;
 
         stream
@@ -316,18 +338,25 @@ mod tests {
         stream.flush().await?;
 
         // Drip feed the body
-        for _ in 0..100 {
+        for _ in 0..5 {
             let _ = stream.write_all(b"a").await;
             stream.flush().await?;
-            sleep(Duration::from_millis(100)).await; // 10 seconds total for 100 bytes
+            sleep(Duration::from_secs(1)).await;
         }
 
-        resume();
+        // Advance time past the 5s request timeout
+        advance(Duration::from_secs(6)).await;
 
-        let mut response = vec![0u8; 1024];
-        let result = stream.read(&mut response).await;
+        // Server should have timed out and closed the connection
+        let mut buf = vec![0u8; 1024];
+        let n = stream.read(&mut buf).await.unwrap();
+        let resp = String::from_utf8_lossy(&buf[..n]);
 
-        assert!(result.is_err());
+        assert!(resp.contains("408"), "expected HTTP 408, got:\n{}", resp);
+        assert!(
+            harness.try_recv().is_err(),
+            "slowloris request must not reach handler"
+        );
 
         Ok(())
     }
@@ -349,7 +378,7 @@ mod tests {
             sleep(Duration::from_millis(45)).await; // 4.5 seconds total for 100 bytes
         }
 
-        resume();
+        advance(Duration::from_secs(6)).await;
 
         let mut response = vec![0u8; 1024];
         let n = stream.read(&mut response).await.unwrap();
