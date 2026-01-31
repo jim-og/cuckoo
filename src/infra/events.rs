@@ -38,6 +38,7 @@ impl TimerServiceEventSource {
             logger.clone(),
             3000,
             ready_sender,
+            shutdown_signal(),
         ));
 
         // Wait for the server to be ready
@@ -81,4 +82,11 @@ impl TimerServiceEventSource {
             let _ = termination.await;
         })))
     }
+}
+
+async fn shutdown_signal() {
+    // Wait for the CTRL+C signal
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to install CTRL+C signal handler");
 }
