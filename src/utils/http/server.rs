@@ -108,7 +108,7 @@ pub async fn run_server(
     let http = http1::Builder::new();
 
     // Create a graceful shutdown watcher
-    let graceful = GracefulShutdown::new();
+    let graceful = Arc::new(GracefulShutdown::new());
 
     // Create a watcher for the shutdown signal to complete
     let mut signal = std::pin::pin!(shutdown_signal());
@@ -121,6 +121,7 @@ pub async fn run_server(
                 let request_sender = request_sender.clone();
                 let logger = logger.clone();
                 let http = http.clone();
+                let graceful = graceful.clone();
 
                 tokio::spawn(async move {
                     let service = service_fn(move |req: Request<Incoming>| {
@@ -128,19 +129,28 @@ pub async fn run_server(
                         handle_request(req, request_sender)
                     });
 
-                    if let Err(err) = http.serve_connection(io, service).await {
+                    let conn = graceful.watch(http.serve_connection(io, service));
+
+                    if let Err(err) = conn.await {
                         logger.error(&format!("Connection error: {:?}", err));
                     }
                 });
             },
             _ = &mut signal => {
                 // Shutdown signal completed, stop the accept event loop
-                drop(listener);
                 logger.info("Graceful shutdown signal received");
                 break;
             }
         }
     }
+
+    let graceful = match Arc::try_unwrap(graceful) {
+        Ok(graceful) => graceful,
+        Err(_) => {
+            logger.error("Failed to unwrap GracefulShutdown (connections still active)");
+            return Ok(());
+        }
+    };
 
     // Start the shutdown procedure and wait for all connection to complete
     // with a timeout to limit how long to wait.
