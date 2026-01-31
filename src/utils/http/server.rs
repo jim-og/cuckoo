@@ -1,8 +1,8 @@
-use crate::utils::Logger;
+use crate::utils::http::{HttpResponse, RequestSender, full};
+use crate::utils::{HttpRequest, Logger};
 use anyhow::Result;
-use http_body_util::combinators::BoxBody;
-use http_body_util::{BodyExt, Full, Limited};
-use hyper::body::{Bytes, Incoming};
+use http_body_util::{BodyExt, Limited};
+use hyper::body::Incoming;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
@@ -12,28 +12,13 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 use tokio::time::timeout;
-
-pub struct HttpRequest {
-    pub method: http::Method,
-    pub path: String,
-    pub body: Bytes,
-}
-
-pub type RequestSender = mpsc::Sender<HttpRequest>;
-
-/// Helper function to create a Full body.
-fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {
-    Full::new(chunk.into())
-        .map_err(|never| match never {})
-        .boxed()
-}
 
 pub async fn handle_request(
     req: Request<Incoming>,
     request_sender: RequestSender,
-) -> Result<Response<BoxBody<Bytes, hyper::Error>>, hyper::Error> {
+) -> Result<HttpResponse, hyper::Error> {
     let method = req.method().clone();
     let path = req.uri().path().to_string();
 
@@ -163,8 +148,10 @@ mod tests {
     use super::*;
     use crate::utils::StdoutLogger;
     use http::Method;
+    use hyper::body::Bytes;
     use std::sync::atomic::{AtomicU16, Ordering};
     use tokio::io::AsyncReadExt;
+    use tokio::sync::mpsc;
     use tokio::time::{Duration, advance, sleep};
     use tokio::{io::AsyncWriteExt, net::TcpStream, sync::mpsc::error::TryRecvError};
 
