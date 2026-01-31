@@ -52,12 +52,20 @@ pub async fn handle_request(
     // Set an upper bound of 64kb for body size
     let limited_body = Limited::new(req.into_body(), 1024 * 64);
 
-    // Await the whole body to be collected
-    let body = match limited_body.collect().await {
-        Ok(collected_body) => collected_body.to_bytes(),
-        Err(_) => {
+    // Timeout on body collection to prevent slowloris attack.
+    let request_timout = Duration::from_secs(5);
+
+    // Await the whole body to be collected.
+    let body = match timeout(request_timout, limited_body.collect()).await {
+        Ok(Ok(collected_body)) => collected_body.to_bytes(),
+        Ok(Err(_)) => {
             let mut resp = Response::new(full("Body too big"));
             *resp.status_mut() = StatusCode::PAYLOAD_TOO_LARGE;
+            return Ok(resp);
+        }
+        Err(_) => {
+            let mut resp = Response::new(full("Request timed out"));
+            *resp.status_mut() = StatusCode::REQUEST_TIMEOUT;
             return Ok(resp);
         }
     };
@@ -99,9 +107,6 @@ pub async fn run_server(
     // Create a watcher for the shutdown signal to complete
     let mut signal = std::pin::pin!(shutdown_signal());
 
-    // Request timeout to prevent slowloris attacks
-    let request_timeout = Duration::from_secs(5);
-
     // Start an event loop to continuously accept incoming connections
     loop {
         tokio::select! {
@@ -117,17 +122,8 @@ pub async fn run_server(
                         handle_request(req, request_sender)
                     });
 
-                    // Wrap the connection in a timeout
-                    match timeout(request_timeout, http.serve_connection(io, service)).await {
-                        Ok(Ok(_)) => {
-                            // Connection completed successfully
-                        },
-                        Ok(Err(err)) => {
-                            logger.error(&format!("Connection error: {:?}", err));
-                        }
-                        Err(_) => {
-                            logger.error("Connection timed out");
-                        },
+                    if let Err(err) = http.serve_connection(io, service).await {
+                        logger.error(&format!("Connection error: {:?}", err));
                     }
                 });
             },
