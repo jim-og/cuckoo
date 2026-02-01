@@ -2,9 +2,6 @@ use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::Response;
 use hyper::body::Bytes;
-use tokio::sync::mpsc;
-
-pub type RequestSender = mpsc::Sender<HttpRequest>;
 
 pub struct HttpRequest {
     pub method: http::Method,

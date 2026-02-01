@@ -2,34 +2,20 @@ use crate::utils::{
     HttpRequest,
     http::{HttpResponse, full},
 };
+use async_trait::async_trait;
 use http::{Method, StatusCode};
 use hyper::Response;
-use std::{
-    collections::HashMap,
-    hash::{Hash, Hasher},
-};
+use std::{collections::HashMap, hash::Hash};
 
+#[async_trait]
 pub trait RouteHandler: Send + Sync + 'static {
-    fn handle(&self, req: HttpRequest) -> Result<HttpResponse, HttpResponse>;
+    async fn handle(&self, req: HttpRequest) -> Result<HttpResponse, HttpResponse>;
 }
 
-#[derive(Clone, Eq)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct RouteKey {
     pub method: Method,
     pub path: String,
-}
-
-impl PartialEq for RouteKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.method == other.method && self.path == other.path
-    }
-}
-
-impl Hash for RouteKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.method.hash(state);
-        self.path.hash(state);
-    }
 }
 
 impl From<&HttpRequest> for RouteKey {
@@ -66,10 +52,10 @@ impl Router {
         self
     }
 
-    pub fn route(&self, req: HttpRequest) -> HttpResponse {
+    pub async fn route(&self, req: HttpRequest) -> HttpResponse {
         let key = (&req).into();
         match self.routes.get(&key) {
-            Some(handler) => match handler.handle(req) {
+            Some(handler) => match handler.handle(req).await {
                 Ok(resp) | Err(resp) => resp,
             },
             None => {
@@ -78,5 +64,11 @@ impl Router {
                 resp
             }
         }
+    }
+}
+
+impl Default for Router {
+    fn default() -> Self {
+        Self::new()
     }
 }
