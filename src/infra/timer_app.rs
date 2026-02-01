@@ -1,6 +1,6 @@
 use crate::{
     core::{Timer, TimerService},
-    infra::events::TimerServiceEventSource,
+    infra::event_receiver::EventReceiver,
     utils::Logger,
 };
 use anyhow::{Context, Result};
@@ -13,14 +13,14 @@ use tokio::sync::{
 
 pub struct TimerApp {
     service: TimerService,
-    event_source: TimerServiceEventSource,
+    event_receiver: EventReceiver,
     timer_receiver: Receiver<Timer>,
     logger: Arc<dyn Logger>,
 }
 
 impl TimerApp {
     pub async fn new(logger: Arc<dyn Logger>) -> Result<Self> {
-        let event_source = TimerServiceEventSource::new(logger.clone()).await?;
+        let event_receiver = EventReceiver::new(logger.clone()).await?;
 
         // Setup publisher
         let (timer_sender, timer_receiver) = mpsc::channel::<Timer>(1024);
@@ -29,7 +29,7 @@ impl TimerApp {
 
         Ok(Self {
             service,
-            event_source,
+            event_receiver,
             timer_receiver,
             logger,
         })
@@ -41,7 +41,7 @@ impl TimerApp {
         readiness_sender: oneshot::Sender<()>,
     ) -> Result<()> {
         let mut events = self
-            .event_source
+            .event_receiver
             .take_stream(termination_receiver)
             .context("Missing termination event stream")?;
 
