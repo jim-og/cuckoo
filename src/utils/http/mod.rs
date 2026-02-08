@@ -1,3 +1,6 @@
+mod client;
+pub use client::*;
+
 mod router;
 pub use router::*;
 
