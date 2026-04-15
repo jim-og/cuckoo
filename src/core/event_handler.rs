@@ -9,19 +9,19 @@ use tokio::{
     time::{Duration, Instant, sleep_until},
 };
 
-pub enum TimerServiceEvent {
+pub enum TimerEvent {
     Insert(Timer),
 }
 
-pub struct TimerService {
-    event_sender: mpsc::Sender<TimerServiceEvent>,
+pub struct EventHandler {
+    event_sender: mpsc::Sender<TimerEvent>,
 }
 
-impl TimerService {
+impl EventHandler {
     pub fn new(timer_sender: Sender<Timer>, logger: Arc<dyn Logger>) -> Self {
         let clock = Arc::new(SystemClock {});
         let store = Store::new(clock.clone());
-        let (event_sender, event_receiver) = mpsc::channel::<TimerServiceEvent>(1024);
+        let (event_sender, event_receiver) = mpsc::channel::<TimerEvent>(1024);
 
         tokio::spawn(Self::run(store, event_receiver, timer_sender, logger));
 
@@ -30,7 +30,7 @@ impl TimerService {
 
     pub async fn run(
         mut store: Store,
-        mut event_receiver: mpsc::Receiver<TimerServiceEvent>,
+        mut event_receiver: mpsc::Receiver<TimerEvent>,
         timer_sender: mpsc::Sender<Timer>,
         logger: Arc<dyn Logger>,
     ) {
@@ -43,7 +43,7 @@ impl TimerService {
                 Some(event) = event_receiver.recv() => {
                     logger.info("new event arrived");
                     match event {
-                        TimerServiceEvent::Insert(timer) => store.insert(timer),
+                        TimerEvent::Insert(timer) => store.insert(timer),
                     }
                 }
                 // Timer fired
@@ -65,7 +65,7 @@ impl TimerService {
         }
     }
 
-    pub async fn handle_event(&mut self, event: TimerServiceEvent) -> Result<()> {
+    pub async fn handle_event(&mut self, event: TimerEvent) -> Result<()> {
         // TODO handle error
         let _ = self.event_sender.send(event).await;
         Ok(())
