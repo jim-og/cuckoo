@@ -1,5 +1,5 @@
 use crate::{
-    core::{TimeT, Timer, TimerId, TimerServiceEvent},
+    core::{TimeT, Timer, TimerEvent, TimerId},
     utils::{HttpRequest, HttpResponse, RouteHandler, full},
 };
 use async_trait::async_trait;
@@ -18,11 +18,11 @@ impl RouteHandler for StatusHandler {
 }
 
 pub struct TimerHandler {
-    event_sender: Sender<TimerServiceEvent>,
+    event_sender: Sender<TimerEvent>,
 }
 
 impl TimerHandler {
-    pub fn new(event_sender: Sender<TimerServiceEvent>) -> Self {
+    pub fn new(event_sender: Sender<TimerEvent>) -> Self {
         Self { event_sender }
     }
 }
@@ -48,7 +48,7 @@ impl RouteHandler for TimerHandler {
             payload.interval_ms,
         );
 
-        let event = TimerServiceEvent::Insert(timer);
+        let event = TimerEvent::Insert(timer);
 
         self.event_sender.send(event).await.map_err(|_| {
             let mut resp = Response::new(full("Server overloaded"));

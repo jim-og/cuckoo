@@ -1,5 +1,5 @@
 use crate::{
-    infra::timer_app::TimerApp,
+    infra::app::App,
     utils::{Logger, StdoutLogger},
 };
 use anyhow::{Context, Result};
@@ -38,7 +38,7 @@ impl MainProgram {
     ) -> Result<()> {
         let _ = self.log_startup_banner();
 
-        let mut app = TimerApp::new(self.logger.clone())
+        let mut app = App::new(self.logger.clone())
             .await
             .context("Failed to create app")?;
 

@@ -1,5 +1,5 @@
 use crate::{
-    core::TimerServiceEvent,
+    core::TimerEvent,
     infra::handlers::{StatusHandler, TimerHandler},
     utils::{Logger, Router, run_server},
 };
@@ -14,15 +14,15 @@ use tokio::sync::{
 use tokio_stream::wrappers::ReceiverStream;
 
 pub type EventStream<T> = Pin<Box<dyn Stream<Item = T> + Send + 'static>>;
-pub type TimerServiceEventStream = EventStream<TimerServiceEvent>;
+pub type TimerEventStream = EventStream<TimerEvent>;
 
 pub struct EventReceiver {
-    event_stream: Option<TimerServiceEventStream>,
+    event_stream: Option<TimerEventStream>,
 }
 
 impl EventReceiver {
     pub async fn new(logger: Arc<dyn Logger>) -> Result<Self> {
-        let (event_sender, event_receiver) = mpsc::channel::<TimerServiceEvent>(1024);
+        let (event_sender, event_receiver) = mpsc::channel::<TimerEvent>(1024);
 
         // Build router
         let router = Arc::new(Router::new().add(Method::GET, "/", StatusHandler {}).add(
@@ -54,7 +54,7 @@ impl EventReceiver {
     pub fn take_stream(
         &mut self,
         termination: tokio::sync::oneshot::Receiver<()>,
-    ) -> Option<TimerServiceEventStream> {
+    ) -> Option<TimerEventStream> {
         let stream = self.event_stream.take()?;
         Some(Box::pin(stream.take_until(async move {
             let _ = termination.await;

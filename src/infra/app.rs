@@ -1,5 +1,5 @@
 use crate::{
-    core::{Timer, TimerService},
+    core::{EventHandler, Timer},
     infra::event_receiver::EventReceiver,
     utils::Logger,
 };
@@ -11,24 +11,24 @@ use tokio::sync::{
     oneshot,
 };
 
-pub struct TimerApp {
-    service: TimerService,
+pub struct App {
+    event_handler: EventHandler,
     event_receiver: EventReceiver,
     timer_receiver: Receiver<Timer>,
     logger: Arc<dyn Logger>,
 }
 
-impl TimerApp {
+impl App {
     pub async fn new(logger: Arc<dyn Logger>) -> Result<Self> {
         let event_receiver = EventReceiver::new(logger.clone()).await?;
 
         // Setup publisher
         let (timer_sender, timer_receiver) = mpsc::channel::<Timer>(1024);
 
-        let service = TimerService::new(timer_sender, logger.clone());
+        let event_handler = EventHandler::new(timer_sender, logger.clone());
 
         Ok(Self {
-            service,
+            event_handler,
             event_receiver,
             timer_receiver,
             logger,
@@ -55,7 +55,7 @@ impl TimerApp {
                 event = events.next() => {
                     match event {
                         Some(event) => {
-                            if let Err(err) = self.service.handle_event(event).await {
+                            if let Err(err) = self.event_handler.handle_event(event).await {
                                 self.logger.error(&format!("Error handling event {err}"));
                             }
                         },
