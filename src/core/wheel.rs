@@ -1,12 +1,12 @@
-use crate::core::{clock::TimeT, timer::Timer};
+use crate::core::timer::{Timer, TimeT};
 use std::collections::{BinaryHeap, HashSet};
 
 pub const SHORT_WHEEL_NUM_BUCKETS: usize = 128;
 pub const LONG_WHEEL_NUM_BUCKETS: usize = 4096;
 pub const SHORT_WHEEL_RESOLUTION_MS: TimeT = 8;
-pub const SHORT_WHEEL_PERIOD_MS: TimeT = SHORT_WHEEL_RESOLUTION_MS * SHORT_WHEEL_NUM_BUCKETS;
+pub const SHORT_WHEEL_PERIOD_MS: TimeT = SHORT_WHEEL_RESOLUTION_MS * SHORT_WHEEL_NUM_BUCKETS as TimeT;
 pub const LONG_WHEEL_RESOLUTION_MS: TimeT = SHORT_WHEEL_PERIOD_MS;
-pub const LONG_WHEEL_PERIOD_MS: TimeT = LONG_WHEEL_RESOLUTION_MS * LONG_WHEEL_NUM_BUCKETS;
+pub const LONG_WHEEL_PERIOD_MS: TimeT = LONG_WHEEL_RESOLUTION_MS * LONG_WHEEL_NUM_BUCKETS as TimeT;
 
 pub type Bucket = HashSet<Timer>;
 
@@ -78,7 +78,7 @@ impl Wheel {
     }
 
     fn bucket_index(&self, timestamp: TimeT) -> usize {
-        (timestamp / self.resolution) % self.buckets.len()
+        ((timestamp / self.resolution) % self.buckets.len() as TimeT) as usize
     }
 
     pub fn round_timestamp(&self, timestamp: TimeT) -> TimeT {

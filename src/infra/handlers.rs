@@ -29,7 +29,7 @@ impl TimerHandler {
 
 #[derive(Deserialize)]
 struct RequestPayload {
-    interval_ms: usize,
+    interval_ms: u64,
 }
 
 #[async_trait]
