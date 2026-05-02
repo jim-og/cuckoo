@@ -1,10 +1,11 @@
-use crate::core::timer::{Timer, TimeT};
+use crate::core::timer::{TimeT, Timer};
 use std::collections::{BinaryHeap, HashSet};
 
 pub const SHORT_WHEEL_NUM_BUCKETS: usize = 128;
 pub const LONG_WHEEL_NUM_BUCKETS: usize = 4096;
 pub const SHORT_WHEEL_RESOLUTION_MS: TimeT = 8;
-pub const SHORT_WHEEL_PERIOD_MS: TimeT = SHORT_WHEEL_RESOLUTION_MS * SHORT_WHEEL_NUM_BUCKETS as TimeT;
+pub const SHORT_WHEEL_PERIOD_MS: TimeT =
+    SHORT_WHEEL_RESOLUTION_MS * SHORT_WHEEL_NUM_BUCKETS as TimeT;
 pub const LONG_WHEEL_RESOLUTION_MS: TimeT = SHORT_WHEEL_PERIOD_MS;
 pub const LONG_WHEEL_PERIOD_MS: TimeT = LONG_WHEEL_RESOLUTION_MS * LONG_WHEEL_NUM_BUCKETS as TimeT;
 

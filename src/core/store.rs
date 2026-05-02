@@ -1,5 +1,5 @@
 use crate::core::{
-    timer::{Timer, TimerId, TimeT},
+    timer::{TimeT, Timer, TimerId},
     wheel::{Bucket, TimerHeap, Wheel},
 };
 use std::collections::HashMap;
