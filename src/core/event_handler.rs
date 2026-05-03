@@ -36,8 +36,10 @@ impl EventHandler {
         logger: Arc<dyn Logger>,
     ) {
         loop {
-            // TODO get deadline from store
-            let next_deadline = Some(Instant::now() + Duration::from_millis(2));
+            let now_ms = Utc::now().timestamp_millis() as u64;
+            let next_deadline = store.next_deadline().map(|deadline_ms| {
+                Instant::now() + Duration::from_millis(deadline_ms.saturating_sub(now_ms))
+            });
 
             tokio::select! {
                 // New event arrived

@@ -53,6 +53,16 @@ impl Store {
         }
     }
 
+    pub fn next_deadline(&self) -> Option<TimeT> {
+        if !self.overdue.is_empty() {
+            return Some(self.tick);
+        }
+        if self.lookup.is_empty() {
+            return None;
+        }
+        Some(self.tick + self.short_wheel.resolution)
+    }
+
     pub fn pop(&mut self, now: TimeT) -> Bucket {
         // Pop overdue timers regardless of whether we're processing new ticks.
         let mut timers = std::mem::take(&mut self.overdue);
@@ -269,6 +279,40 @@ mod tests {
         // Advance by 500ms + one tick, all timers pop.
         clock.advance(500 + TIMER_GRANULARITY_MS);
         assert_eq!(3, store.pop(clock.now()).len());
+    }
+
+    #[test]
+    fn next_deadline_empty_store() {
+        let (_clock, store) = setup();
+        assert_eq!(None, store.next_deadline());
+    }
+
+    #[test]
+    fn next_deadline_with_future_timer() {
+        let (clock, mut store) = setup();
+        store.insert(Timer::new(TimerId::new(), clock.now(), 1000));
+        assert_eq!(Some(TIMER_GRANULARITY_MS), store.next_deadline());
+    }
+
+    #[test]
+    fn next_deadline_with_overdue_timer() {
+        let (mut clock, mut store) = setup();
+        clock.advance(500);
+        // Advance the store's internal tick so the next insert lands in overdue.
+        store.pop(clock.now());
+        store.insert(Timer::new(TimerId::new(), 0, 100));
+        assert_eq!(Some(store.tick), store.next_deadline());
+    }
+
+    #[test]
+    fn next_deadline_after_pop_drains_wheels() {
+        let (mut clock, mut store) = setup();
+        store.insert(Timer::new(TimerId::new(), clock.now(), 100));
+
+        clock.advance(100 + TIMER_GRANULARITY_MS);
+        assert_eq!(1, store.pop(clock.now()).len());
+
+        assert_eq!(None, store.next_deadline());
     }
 
     #[test]
