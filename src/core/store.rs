@@ -146,7 +146,7 @@ mod tests {
     use crate::core::wheel;
     use test_case::test_case;
 
-    const G: TimeT = wheel::SHORT_WHEEL_RESOLUTION_MS;
+    const TIMER_GRANULARITY_MS: TimeT = wheel::SHORT_WHEEL_RESOLUTION_MS;
 
     #[test_case(100; "short")]
     #[test_case(1600; "long")]
@@ -155,8 +155,8 @@ mod tests {
         let mut store = Store::new(0);
         store.insert(Timer::new(TimerId::new(), 0, interval));
 
-        assert_eq!(0, store.pop(interval - G).len());
-        assert_eq!(1, store.pop(interval + G).len());
+        assert_eq!(0, store.pop(interval - TIMER_GRANULARITY_MS).len());
+        assert_eq!(1, store.pop(interval + TIMER_GRANULARITY_MS).len());
     }
 
     #[test_case(100; "short")]
@@ -167,8 +167,8 @@ mod tests {
         store.insert(Timer::new(TimerId::new(), 0, interval));
         store.insert(Timer::new(TimerId::new(), 0, interval));
 
-        assert_eq!(0, store.pop(interval - G).len());
-        assert_eq!(2, store.pop(interval + G).len());
+        assert_eq!(0, store.pop(interval - TIMER_GRANULARITY_MS).len());
+        assert_eq!(2, store.pop(interval + TIMER_GRANULARITY_MS).len());
     }
 
     #[test_case(100; "short")]
@@ -181,7 +181,7 @@ mod tests {
 
         store.remove(&id);
 
-        assert_eq!(0, store.pop(interval + G).len());
+        assert_eq!(0, store.pop(interval + TIMER_GRANULARITY_MS).len());
     }
 
     #[test]
@@ -228,7 +228,7 @@ mod tests {
         store.insert(Timer::new(TimerId::new(), 60 * 60 * 1000 + 1000, 500));
 
         // Advance by 500ms + one tick, all timers pop.
-        assert_eq!(3, store.pop(60 * 60 * 1000 + 1000 + 500 + G).len());
+        assert_eq!(3, store.pop(60 * 60 * 1000 + 1000 + 500 + TIMER_GRANULARITY_MS).len());
     }
 
     #[test]
@@ -241,13 +241,13 @@ mod tests {
         let id_3 = TimerId::new();
 
         // timer_2 pops first, timer_3 next, timer_1 last.
-        let timer_2_interval = 3600 * 1000 + G * 4;
+        let timer_2_interval = 3600 * 1000 + TIMER_GRANULARITY_MS * 4;
 
-        store.insert(Timer::new(id_1, 0, 3600 * 1000 * 10 + G * 2));
+        store.insert(Timer::new(id_1, 0, 3600 * 1000 * 10 + TIMER_GRANULARITY_MS * 2));
         store.insert(Timer::new(id_2.clone(), 0, timer_2_interval));
-        store.insert(Timer::new(id_3, 0, 3600 * 1000 * 5 + G * 6));
+        store.insert(Timer::new(id_3, 0, 3600 * 1000 * 5 + TIMER_GRANULARITY_MS * 6));
 
-        let timers = store.pop(timer_2_interval + G);
+        let timers = store.pop(timer_2_interval + TIMER_GRANULARITY_MS);
         assert_eq!(1, timers.len());
 
         if let Some(timer) = timers.iter().next() {
