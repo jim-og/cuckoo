@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cargo fmt --all",
+            "description": "Keep code clean during development"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cargo clippy --all-targets --all-features -- -D warnings || echo '{\"decision\": \"block\", \"reason\": \"Clippy found lint warnings or errors. Please fix them before finishing.\"}'",
+            "description": "Block task completion if lints fail"
+          },
+          {
+            "type": "command",
+            "command": "cargo fmt --all",
+            "description": "Final formatting check"
+          }
+        ]
+      }
+    ]
+  }
+}
