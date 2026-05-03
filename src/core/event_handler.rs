@@ -1,8 +1,9 @@
 use crate::{
-    core::{clock::SystemClock, store::Store, timer::Timer},
+    core::{store::Store, timer::Timer},
     utils::Logger,
 };
 use anyhow::Result;
+use chrono::Utc;
 use std::sync::Arc;
 use tokio::{
     sync::mpsc::{self, Sender},
@@ -19,8 +20,8 @@ pub struct EventHandler {
 
 impl EventHandler {
     pub fn new(timer_sender: Sender<Timer>, logger: Arc<dyn Logger>) -> Self {
-        let clock = Arc::new(SystemClock {});
-        let store = Store::new(clock.clone());
+        let now = Utc::now().timestamp_millis() as u64;
+        let store = Store::new(now);
         let (event_sender, event_receiver) = mpsc::channel::<TimerEvent>(1024);
 
         tokio::spawn(Self::run(store, event_receiver, timer_sender, logger));
@@ -54,7 +55,8 @@ impl EventHandler {
                         futures::future::pending::<()>().await;
                     }
                 } => {
-                    let bucket = store.pop();
+                    let now = Utc::now().timestamp_millis() as u64;
+                    let bucket = store.pop(now);
                     for timer in bucket {
                         let _ = timer_sender.send(timer).await;
                     }

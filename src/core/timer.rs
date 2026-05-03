@@ -1,6 +1,7 @@
-use crate::core::clock::TimeT;
 use std::cmp::Ordering;
 use uuid::Uuid;
+
+pub type TimeT = u64;
 
 /// A Universally Unique Identifier (UUID) for Timers.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
