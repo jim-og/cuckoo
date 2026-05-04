@@ -46,7 +46,7 @@ impl EventHandler {
         clock: Arc<dyn Clock>,
     ) {
         loop {
-            let now_ms = Utc::now().timestamp_millis() as u64;
+            let now_ms = clock.now();
             let next_deadline = store.next_deadline().map(|deadline_ms| {
                 Instant::now() + Duration::from_millis(deadline_ms.saturating_sub(now_ms))
             });

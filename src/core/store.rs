@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn next_deadline_with_future_timer() {
         let (clock, mut store) = setup();
-        store.insert(Timer::new(TimerId::new(), clock.now(), 1000));
+        store.insert(Timer::new(TimerId::new(), clock.now(), 1000, None));
         assert_eq!(Some(TIMER_GRANULARITY_MS), store.next_deadline());
     }
 
@@ -301,14 +301,14 @@ mod tests {
         clock.advance(500);
         // Advance the store's internal tick so the next insert lands in overdue.
         store.pop(clock.now());
-        store.insert(Timer::new(TimerId::new(), 0, 100));
+        store.insert(Timer::new(TimerId::new(), 0, 100, None));
         assert_eq!(Some(store.tick), store.next_deadline());
     }
 
     #[test]
     fn next_deadline_after_pop_drains_wheels() {
         let (mut clock, mut store) = setup();
-        store.insert(Timer::new(TimerId::new(), clock.now(), 100));
+        store.insert(Timer::new(TimerId::new(), clock.now(), 100, None));
 
         clock.advance(100 + TIMER_GRANULARITY_MS);
         assert_eq!(1, store.pop(clock.now()).len());
