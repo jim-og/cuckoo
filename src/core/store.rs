@@ -368,7 +368,7 @@ mod tests {
     fn remove_already_removed_id_returns_false() {
         let (clock, mut store) = setup();
         let id = TimerId::new();
-        store.insert(Timer::new(id.clone(), clock.now(), 100));
+        store.insert(Timer::new(id.clone(), clock.now(), 100, None));
 
         assert!(store.remove(&id));
         assert!(!store.remove(&id));

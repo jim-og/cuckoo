@@ -68,6 +68,8 @@ impl RouteHandler for TimerHandler {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::SystemClock;
+
     use super::*;
     use bytes::Bytes;
     use http::Method;
@@ -103,8 +105,9 @@ mod tests {
 
     #[tokio::test]
     async fn timer_handler_invalid_json_returns_bad_request() {
+        let clock = Arc::new(SystemClock);
         let (sender, _receiver) = mpsc::channel::<TimerEvent>(1);
-        let handler = TimerHandler::new(sender);
+        let handler = TimerHandler::new(sender, clock);
 
         let resp = handler
             .handle(request(Method::POST, b"not json"))
@@ -117,9 +120,10 @@ mod tests {
 
     #[tokio::test]
     async fn timer_handler_dropped_receiver_returns_service_unavailable() {
+        let clock = Arc::new(SystemClock);
         let (sender, receiver) = mpsc::channel::<TimerEvent>(1);
         drop(receiver);
-        let handler = TimerHandler::new(sender);
+        let handler = TimerHandler::new(sender, clock);
 
         let resp = handler
             .handle(request(Method::POST, br#"{"interval_ms": 100}"#))
@@ -132,8 +136,9 @@ mod tests {
 
     #[tokio::test]
     async fn timer_handler_happy_path_sends_event_and_returns_id() {
+        let clock = Arc::new(SystemClock);
         let (sender, mut receiver) = mpsc::channel::<TimerEvent>(1);
-        let handler = TimerHandler::new(sender);
+        let handler = TimerHandler::new(sender, clock);
 
         let resp = handler
             .handle(request(Method::POST, br#"{"interval_ms": 100}"#))

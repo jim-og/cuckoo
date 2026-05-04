@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     fn pop_time_is_start_plus_interval() {
-        let timer = Timer::new(TimerId::new(), 100, 250);
+        let timer = Timer::new(TimerId::new(), 100, 250, None);
         assert_eq!(timer.pop_time(), 350);
     }
 
@@ -105,8 +105,8 @@ mod tests {
 
     #[test]
     fn ord_reverses_pop_time_for_min_heap() {
-        let earlier = Timer::new(TimerId::new(), 0, 100);
-        let later = Timer::new(TimerId::new(), 0, 200);
+        let earlier = Timer::new(TimerId::new(), 0, 100, None);
+        let later = Timer::new(TimerId::new(), 0, 200, None);
 
         // The smaller pop_time should compare as Greater so a max-heap (BinaryHeap)
         // pops it first — i.e. the heap behaves as a min-heap on pop_time.

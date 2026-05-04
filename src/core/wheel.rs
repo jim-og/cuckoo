@@ -143,7 +143,7 @@ mod tests {
     use crate::core::timer::TimerId;
 
     fn timer_at(pop_time: TimeT) -> Timer {
-        Timer::new(TimerId::new(), 0, pop_time)
+        Timer::new(TimerId::new(), 0, pop_time, None)
     }
 
     #[test]
