@@ -9,12 +9,9 @@ use std::{
     future::Future,
     sync::{Arc, atomic::AtomicUsize},
 };
-use tokio::{
-    sync::{
-        mpsc::{self, Receiver},
-        oneshot,
-    },
-    time::Duration,
+use tokio::sync::{
+    mpsc::{self, Receiver},
+    oneshot,
 };
 
 pub struct App {
@@ -45,13 +42,7 @@ impl App {
         )
         .await?;
 
-        let event_handler = EventHandler::new(
-            timer_sender,
-            logger.clone(),
-            clock,
-            Duration::from_millis(2),
-            active_count,
-        );
+        let event_handler = EventHandler::new(timer_sender, logger.clone(), clock, active_count);
 
         Ok(Self {
             event_handler,

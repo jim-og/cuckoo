@@ -25,7 +25,6 @@ impl EventHandler {
         timer_sender: Sender<Timer>,
         logger: Arc<dyn Logger>,
         clock: Arc<dyn Clock>,
-        poll_interval: Duration,
         active_count: Arc<AtomicUsize>,
     ) -> Self {
         let now = clock.now();
@@ -38,7 +37,6 @@ impl EventHandler {
             timer_sender,
             logger,
             clock,
-            poll_interval,
             active_count,
         ));
 
@@ -51,7 +49,6 @@ impl EventHandler {
         timer_sender: mpsc::Sender<Timer>,
         logger: Arc<dyn Logger>,
         clock: Arc<dyn Clock>,
-        poll_interval: Duration,
         active_count: Arc<AtomicUsize>,
     ) {
         loop {
