@@ -1,11 +1,11 @@
 use crate::{
-    core::{TimeT, Timer, TimerEvent, TimerId},
+    core::{Clock, Timer, TimerEvent, TimerId},
     utils::{HttpRequest, HttpResponse, RouteHandler, full},
 };
 use async_trait::async_trait;
-use chrono::Utc;
 use http::{Response, StatusCode};
 use serde::Deserialize;
+use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 
 pub struct StatusHandler;
@@ -19,17 +19,22 @@ impl RouteHandler for StatusHandler {
 
 pub struct TimerHandler {
     event_sender: Sender<TimerEvent>,
+    clock: Arc<dyn Clock>,
 }
 
 impl TimerHandler {
-    pub fn new(event_sender: Sender<TimerEvent>) -> Self {
-        Self { event_sender }
+    pub fn new(event_sender: Sender<TimerEvent>, clock: Arc<dyn Clock>) -> Self {
+        Self {
+            event_sender,
+            clock,
+        }
     }
 }
 
 #[derive(Deserialize)]
 struct RequestPayload {
     interval_ms: u64,
+    callback_url: Option<String>,
 }
 
 #[async_trait]
@@ -44,8 +49,9 @@ impl RouteHandler for TimerHandler {
         let id = TimerId::new();
         let timer = Timer::new(
             id.to_owned(),
-            Utc::now().timestamp_millis() as TimeT,
+            self.clock.now(),
             payload.interval_ms,
+            payload.callback_url,
         );
 
         let event = TimerEvent::Insert(timer);

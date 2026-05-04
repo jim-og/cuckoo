@@ -28,14 +28,21 @@ pub struct Timer {
     pub id: TimerId,
     start_time: TimeT,
     interval: TimeT,
+    pub callback_url: Option<String>,
 }
 
 impl Timer {
-    pub fn new(id: TimerId, start_time: TimeT, interval: TimeT) -> Self {
+    pub fn new(
+        id: TimerId,
+        start_time: TimeT,
+        interval: TimeT,
+        callback_url: Option<String>,
+    ) -> Self {
         Self {
             id,
             start_time,
             interval,
+            callback_url,
         }
     }
 
