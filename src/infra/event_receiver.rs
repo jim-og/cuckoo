@@ -1,12 +1,12 @@
 use crate::{
-    core::TimerEvent,
+    core::{Clock, TimerEvent},
     infra::handlers::{StatusHandler, TimerHandler},
     utils::{Logger, Router, run_server},
 };
 use anyhow::Result;
 use futures::{Stream, StreamExt};
 use hyper::Method;
-use std::{pin::Pin, sync::Arc};
+use std::{future::Future, pin::Pin, sync::Arc};
 use tokio::sync::{
     mpsc::{self},
     oneshot,
@@ -21,14 +21,19 @@ pub struct EventReceiver {
 }
 
 impl EventReceiver {
-    pub async fn new(logger: Arc<dyn Logger>) -> Result<Self> {
+    pub async fn new(
+        logger: Arc<dyn Logger>,
+        clock: Arc<dyn Clock>,
+        port: u16,
+        shutdown_signal: impl Future<Output = ()> + Send + 'static,
+    ) -> Result<Self> {
         let (event_sender, event_receiver) = mpsc::channel::<TimerEvent>(1024);
 
         // Build router
         let router = Arc::new(Router::new().add(Method::GET, "/", StatusHandler {}).add(
             Method::POST,
             "/timer",
-            TimerHandler::new(event_sender.clone()),
+            TimerHandler::new(event_sender.clone(), clock),
         ));
 
         // Spawn server
@@ -36,9 +41,9 @@ impl EventReceiver {
         tokio::spawn(run_server(
             router,
             logger.clone(),
-            3000,
+            port,
             ready_sender,
-            shutdown_signal(),
+            shutdown_signal,
         ));
 
         // Wait for the server to be ready
@@ -60,11 +65,4 @@ impl EventReceiver {
             let _ = termination.await;
         })))
     }
-}
-
-async fn shutdown_signal() {
-    // Wait for the CTRL+C signal
-    tokio::signal::ctrl_c()
-        .await
-        .expect("failed to install CTRL+C signal handler");
 }

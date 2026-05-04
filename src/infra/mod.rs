@@ -4,4 +4,5 @@ mod handlers;
 mod main_program;
 pub use main_program::MainProgram;
 
-mod app;
+pub mod app;
+pub use app::App;
