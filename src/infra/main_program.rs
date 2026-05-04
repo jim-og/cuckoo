@@ -1,4 +1,5 @@
 use crate::{
+    core::SystemClock,
     infra::app::App,
     utils::{Logger, StdoutLogger},
 };
@@ -38,9 +39,14 @@ impl MainProgram {
     ) -> Result<()> {
         let _ = self.log_startup_banner();
 
-        let mut app = App::new(self.logger.clone())
-            .await
-            .context("Failed to create app")?;
+        let clock = Arc::new(SystemClock);
+        let mut app = App::new(self.logger.clone(), clock, 3000, async {
+            tokio::signal::ctrl_c()
+                .await
+                .expect("failed to install CTRL+C signal handler");
+        })
+        .await
+        .context("Failed to create app")?;
 
         app.run(termination_receiver, readiness_sender)
             .await

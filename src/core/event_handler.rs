@@ -1,9 +1,8 @@
 use crate::{
-    core::{store::Store, timer::Timer},
+    core::{clock::Clock, store::Store, timer::Timer},
     utils::Logger,
 };
 use anyhow::Result;
-use chrono::Utc;
 use std::sync::Arc;
 use tokio::{
     sync::mpsc::{self, Sender},
@@ -19,12 +18,22 @@ pub struct EventHandler {
 }
 
 impl EventHandler {
-    pub fn new(timer_sender: Sender<Timer>, logger: Arc<dyn Logger>) -> Self {
-        let now = Utc::now().timestamp_millis() as u64;
+    pub fn new(
+        timer_sender: Sender<Timer>,
+        logger: Arc<dyn Logger>,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
+        let now = clock.now();
         let store = Store::new(now);
         let (event_sender, event_receiver) = mpsc::channel::<TimerEvent>(1024);
 
-        tokio::spawn(Self::run(store, event_receiver, timer_sender, logger));
+        tokio::spawn(Self::run(
+            store,
+            event_receiver,
+            timer_sender,
+            logger,
+            clock,
+        ));
 
         Self { event_sender }
     }
@@ -34,6 +43,7 @@ impl EventHandler {
         mut event_receiver: mpsc::Receiver<TimerEvent>,
         timer_sender: mpsc::Sender<Timer>,
         logger: Arc<dyn Logger>,
+        clock: Arc<dyn Clock>,
     ) {
         loop {
             let now_ms = Utc::now().timestamp_millis() as u64;
@@ -57,7 +67,7 @@ impl EventHandler {
                         futures::future::pending::<()>().await;
                     }
                 } => {
-                    let now = Utc::now().timestamp_millis() as u64;
+                    let now = clock.now();
                     let bucket = store.pop(now);
                     for timer in bucket {
                         let _ = timer_sender.send(timer).await;
