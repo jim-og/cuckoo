@@ -5,6 +5,16 @@
 //
 // Important: run with --release. Debug builds will be significantly slower
 // and will give misleading results.
+//
+// Examples:
+//   # Calibration — verify generator has headroom before trusting results
+//   cargo run --release --example load_harness -- --calibrate --rate 5000
+//
+//   # Full load test (1000 req/s for 30s steady-state)
+//   cargo run --release --example load_harness -- --rate 1000 --duration 30 --interval-ms 500
+//
+//   # Find saturation point — sweep rates until metrics degrade
+//   cargo run --release --example load_harness -- --rate 5000 --duration 30
 
 use async_trait::async_trait;
 use clap::Parser;

@@ -1,3 +1,7 @@
+// How to run:
+// # Microbenchmarks (criterion, HTML report in target/criterion/)
+// cargo bench --bench store
+
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use cuckoo::core::{Store, Timer, TimerId};
 
