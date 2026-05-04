@@ -1,4 +1,5 @@
 mod store;
+pub use store::Store;
 
 mod timer;
 pub use timer::{TimeT, Timer, TimerId};

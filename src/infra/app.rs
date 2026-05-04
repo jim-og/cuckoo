@@ -5,10 +5,16 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use futures::StreamExt;
-use std::{future::Future, sync::Arc};
-use tokio::sync::{
-    mpsc::{self, Receiver},
-    oneshot,
+use std::{
+    future::Future,
+    sync::{Arc, atomic::AtomicUsize},
+};
+use tokio::{
+    sync::{
+        mpsc::{self, Receiver},
+        oneshot,
+    },
+    time::Duration,
 };
 
 pub struct App {
@@ -26,12 +32,26 @@ impl App {
         port: u16,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
     ) -> Result<Self> {
-        let event_receiver =
-            EventReceiver::new(logger.clone(), clock.clone(), port, shutdown_signal).await?;
-
         let (timer_sender, timer_receiver) = mpsc::channel::<Timer>(1024);
+        let active_count = Arc::new(AtomicUsize::new(0));
 
-        let event_handler = EventHandler::new(timer_sender, logger.clone(), clock);
+        let event_receiver = EventReceiver::new(
+            logger.clone(),
+            clock.clone(),
+            port,
+            shutdown_signal,
+            timer_sender.clone(),
+            active_count.clone(),
+        )
+        .await?;
+
+        let event_handler = EventHandler::new(
+            timer_sender,
+            logger.clone(),
+            clock,
+            Duration::from_millis(2),
+            active_count,
+        );
 
         Ok(Self {
             event_handler,
@@ -81,8 +101,12 @@ impl App {
                         let logger = self.logger.clone();
                         let client = self.http_client.clone();
                         let timer_id = timer.id.uuid().to_string();
+                        let pop_time_ms = timer.pop_time();
                         tokio::spawn(async move {
-                            let payload = serde_json::json!({ "timer_id": timer_id });
+                            let payload = serde_json::json!({
+                                "timer_id": timer_id,
+                                "pop_time_ms": pop_time_ms,
+                            });
                             match client.post(&url).json(&payload).send().await {
                                 Ok(_) => logger.info(&format!("Callback sent to {}", url)),
                                 Err(e) => logger.error(&format!("Callback failed to {}: {}", url, e)),

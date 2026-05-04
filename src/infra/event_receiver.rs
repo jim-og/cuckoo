@@ -1,14 +1,18 @@
 use crate::{
-    core::{Clock, TimerEvent},
-    infra::handlers::{StatusHandler, TimerHandler},
+    core::{Clock, Timer, TimerEvent},
+    infra::handlers::{StatsHandler, StatusHandler, TimerHandler},
     utils::{Logger, Router, run_server},
 };
 use anyhow::Result;
 use futures::{Stream, StreamExt};
 use hyper::Method;
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{Arc, atomic::AtomicUsize},
+};
 use tokio::sync::{
-    mpsc::{self},
+    mpsc::{self, Sender},
     oneshot,
 };
 use tokio_stream::wrappers::ReceiverStream;
@@ -26,15 +30,24 @@ impl EventReceiver {
         clock: Arc<dyn Clock>,
         port: u16,
         shutdown_signal: impl Future<Output = ()> + Send + 'static,
+        timer_sender: Sender<Timer>,
+        active_count: Arc<AtomicUsize>,
     ) -> Result<Self> {
         let (event_sender, event_receiver) = mpsc::channel::<TimerEvent>(1024);
 
+        let stats = StatsHandler::new(active_count, event_sender.clone(), timer_sender);
+
         // Build router
-        let router = Arc::new(Router::new().add(Method::GET, "/", StatusHandler {}).add(
-            Method::POST,
-            "/timer",
-            TimerHandler::new(event_sender.clone(), clock),
-        ));
+        let router = Arc::new(
+            Router::new()
+                .add(Method::GET, "/", StatusHandler {})
+                .add(
+                    Method::POST,
+                    "/timer",
+                    TimerHandler::new(event_sender.clone(), clock),
+                )
+                .add(Method::GET, "/stats", stats),
+        );
 
         // Spawn server
         let (ready_sender, ready_receiver) = oneshot::channel();
