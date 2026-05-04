@@ -173,6 +173,8 @@ mod tests {
         port: u16,
         client: reqwest::Client,
         request_receiver: mpsc::Receiver<HttpRequest>,
+        // Held only so the server keeps running for the duration of the test.
+        #[allow(dead_code)]
         shutdown_sender: oneshot::Sender<()>,
     }
 
@@ -320,29 +322,11 @@ mod tests {
         Ok(())
     }
 
-    #[ignore = "needs fixing"]
-    #[tokio::test]
-    async fn overloaded_server_returns_service_unavailable() -> Result<()> {
-        let TestServerHarness {
-            port,
-            client,
-            request_receiver,
-            shutdown_sender: _shutdown_sender,
-        } = TestServerHarness::new().await;
-
-        // Drop the request receiver to simulate downstream failure
-        drop(request_receiver);
-
-        let resp = client
-            .post(format!("http://127.0.0.1:{}/test", port))
-            .body("hello")
-            .send()
-            .await?;
-
-        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
-
-        Ok(())
-    }
+    // The "overloaded server returns SERVICE_UNAVAILABLE" path lives in
+    // `TimerHandler` (see `infra::handlers::tests::
+    // timer_handler_dropped_receiver_returns_service_unavailable`), not in any
+    // handler used by this server's `TestHandler`, so the previous integration
+    // test here was structurally unable to pass.
 
     #[tokio::test(start_paused = true)]
     async fn slowloris_request_rejected() -> Result<()> {

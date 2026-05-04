@@ -357,4 +357,20 @@ mod tests {
             panic!("Expected there to be a popped timer.");
         }
     }
+
+    #[test]
+    fn remove_unknown_id_returns_false() {
+        let (_clock, mut store) = setup();
+        assert!(!store.remove(&TimerId::new()));
+    }
+
+    #[test]
+    fn remove_already_removed_id_returns_false() {
+        let (clock, mut store) = setup();
+        let id = TimerId::new();
+        store.insert(Timer::new(id.clone(), clock.now(), 100, None));
+
+        assert!(store.remove(&id));
+        assert!(!store.remove(&id));
+    }
 }
