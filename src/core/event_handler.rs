@@ -3,7 +3,10 @@ use crate::{
     utils::Logger,
 };
 use anyhow::Result;
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 use tokio::{
     sync::mpsc::{self, Sender},
     time::{Duration, Instant, sleep_until},
@@ -22,6 +25,7 @@ impl EventHandler {
         timer_sender: Sender<Timer>,
         logger: Arc<dyn Logger>,
         clock: Arc<dyn Clock>,
+        active_count: Arc<AtomicUsize>,
     ) -> Self {
         let now = clock.now();
         let store = Store::new(now);
@@ -33,6 +37,7 @@ impl EventHandler {
             timer_sender,
             logger,
             clock,
+            active_count,
         ));
 
         Self { event_sender }
@@ -44,6 +49,7 @@ impl EventHandler {
         timer_sender: mpsc::Sender<Timer>,
         logger: Arc<dyn Logger>,
         clock: Arc<dyn Clock>,
+        active_count: Arc<AtomicUsize>,
     ) {
         loop {
             let now_ms = clock.now();
@@ -56,7 +62,10 @@ impl EventHandler {
                 Some(event) = event_receiver.recv() => {
                     logger.info("new event arrived");
                     match event {
-                        TimerEvent::Insert(timer) => store.insert(timer),
+                        TimerEvent::Insert(timer) => {
+                            store.insert(timer);
+                            active_count.fetch_add(1, Ordering::Relaxed);
+                        }
                     }
                 }
                 // Timer fired
@@ -69,6 +78,7 @@ impl EventHandler {
                 } => {
                     let now = clock.now();
                     let bucket = store.pop(now);
+                    active_count.fetch_sub(bucket.len(), Ordering::Relaxed);
                     for timer in bucket {
                         let _ = timer_sender.send(timer).await;
                     }
