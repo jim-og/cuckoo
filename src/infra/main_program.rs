@@ -63,16 +63,16 @@ impl MainProgram {
 
     fn set_ctrlc_handler(&self, termination_sender: oneshot::Sender<()>) -> Result<()> {
         let termination_sender = Cell::new(Some(termination_sender));
-        ctrlc::set_handler(move || {
+        let result = ctrlc::set_handler(move || {
             if let Some(sender) = termination_sender.take() {
                 let _ = sender.send(());
             }
         })
-        .context("Error setting Ctrl-C handler")?;
+        .context("Error setting Ctrl-C handler");
 
         self.logger.info("Press CTRL-C to terminate program");
 
-        Ok(())
+        result
     }
 }
 
@@ -101,7 +101,6 @@ mod tests {
     // TODO missing config file
     // TODO invalid config file
 
-    #[ignore = "failing in CI"]
     #[tokio::test]
     async fn run_sets_up_signal_handling() -> Result<()> {
         let logger = Arc::new(StdoutLogger::new().with_receiver());
