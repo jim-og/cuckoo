@@ -40,7 +40,11 @@ impl MainProgram {
         let _ = self.log_startup_banner();
 
         let clock = Arc::new(SystemClock);
-        let mut app = App::new(self.logger.clone(), clock, 3000, async {
+        let port = std::env::var("PORT")
+            .ok()
+            .and_then(|s| s.parse::<u16>().ok())
+            .unwrap_or(3000);
+        let mut app = App::new(self.logger.clone(), clock, port, async {
             tokio::signal::ctrl_c()
                 .await
                 .expect("failed to install CTRL+C signal handler");
