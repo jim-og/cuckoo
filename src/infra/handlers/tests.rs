@@ -34,6 +34,20 @@ async fn status_handler_returns_ok() {
 }
 
 #[tokio::test]
+async fn health_handler_returns_ok() {
+    let handler = HealthHandler;
+    let req = HttpRequest {
+        method: Method::GET,
+        path: "/health".to_string(),
+        body: HyperBytes::new(),
+    };
+
+    let resp = handler.handle(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(body_bytes(resp).await, Bytes::from("OK"));
+}
+
+#[tokio::test]
 async fn timer_handler_invalid_json_returns_bad_request() {
     let clock = Arc::new(SystemClock);
     let (sender, _receiver) = mpsc::channel::<TimerEvent>(1);

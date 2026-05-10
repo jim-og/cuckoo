@@ -1,6 +1,6 @@
 use crate::{
     core::{Clock, TimerEvent},
-    infra::handlers::{StatusHandler, TimerHandler},
+    infra::handlers::{HealthHandler, StatusHandler, TimerHandler},
     utils::{Logger, Router, run_server},
 };
 use anyhow::Result;
@@ -30,11 +30,16 @@ impl EventReceiver {
         let (event_sender, event_receiver) = mpsc::channel::<TimerEvent>(1024);
 
         // Build router
-        let router = Arc::new(Router::new().add(Method::GET, "/", StatusHandler {}).add(
-            Method::POST,
-            "/timer",
-            TimerHandler::new(event_sender.clone(), clock),
-        ));
+        let router = Arc::new(
+            Router::new()
+                .add(Method::GET, "/", StatusHandler {})
+                .add(Method::GET, "/health", HealthHandler {})
+                .add(
+                    Method::POST,
+                    "/timer",
+                    TimerHandler::new(event_sender.clone(), clock),
+                ),
+        );
 
         // Spawn server
         let (ready_sender, ready_receiver) = oneshot::channel();
