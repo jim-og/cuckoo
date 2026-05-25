@@ -173,9 +173,9 @@ mod tests {
         port: u16,
         client: reqwest::Client,
         request_receiver: mpsc::Receiver<HttpRequest>,
-        // Held only so the server keeps running for the duration of the test.
-        #[allow(dead_code)]
-        shutdown_sender: oneshot::Sender<()>,
+        shutdown_sender: Option<oneshot::Sender<()>>,
+        server_handle: Option<tokio::task::JoinHandle<Result<()>>>,
+        logger: Arc<StdoutLogger>,
     }
 
     impl TestServerHarness {
@@ -204,7 +204,7 @@ mod tests {
             );
 
             // Spawn server
-            tokio::spawn(async move {
+            let server_handle = tokio::spawn(async move {
                 run_server(
                     router,
                     server_logger,
@@ -213,17 +213,25 @@ mod tests {
                     shutdown_signal_testable(shutdown_receiver),
                 )
                 .await
-                .unwrap()
             });
 
             // Wait for the server to be ready
             ready_receiver.await.unwrap();
 
+            // Disable the reqwest connection pool so HTTP keep-alive sockets don't
+            // hold per-connection tasks alive across a shutdown trigger.
+            let client = reqwest::Client::builder()
+                .pool_max_idle_per_host(0)
+                .build()
+                .unwrap();
+
             Self {
                 port,
-                client: reqwest::Client::new(),
+                client,
                 request_receiver,
-                shutdown_sender,
+                shutdown_sender: Some(shutdown_sender),
+                server_handle: Some(server_handle),
+                logger,
             }
         }
 
@@ -237,6 +245,18 @@ mod tests {
 
         fn try_recv(&mut self) -> Result<HttpRequest, TryRecvError> {
             self.request_receiver.try_recv()
+        }
+
+        fn trigger_shutdown(&mut self) {
+            let _ = self.shutdown_sender.take().unwrap().send(());
+        }
+
+        async fn await_server_exit(&mut self) -> Result<()> {
+            self.server_handle.take().unwrap().await.unwrap()
+        }
+
+        async fn log_contains(&self, needle: &str) -> bool {
+            self.logger.contains(needle).await
         }
     }
 
@@ -386,6 +406,118 @@ mod tests {
         let resp = String::from_utf8_lossy(&response[..n]);
 
         assert!(resp.contains("200 OK"));
+
+        Ok(())
+    }
+
+    // NOTE: The 10s timeout branch in `run_server` (the `tokio::time::sleep`
+    // arm of the final `tokio::select!`) is effectively unreachable today.
+    // Any in-flight connection's spawned task holds an `Arc::clone` of
+    // `graceful`, so `Arc::try_unwrap` fails first and we short-circuit via
+    // the `Err` arm before reaching `graceful.shutdown()`. By the time
+    // `try_unwrap` succeeds, every per-connection task has dropped its clone,
+    // making `graceful.shutdown()` resolve immediately. If the production
+    // code is later refactored to keep the `Arc` alive across the shutdown
+    // wait, that branch will become reachable and should get a paused-time
+    // test that advances past 10 seconds.
+
+    #[tokio::test]
+    async fn shutdown_with_no_inflight_connections_logs_clean_exit() -> Result<()> {
+        let mut harness = TestServerHarness::new().await;
+
+        harness.trigger_shutdown();
+        harness.await_server_exit().await?;
+
+        assert!(
+            harness
+                .log_contains("Graceful shutdown signal received")
+                .await,
+            "expected shutdown signal log"
+        );
+        assert!(
+            harness
+                .log_contains("All connections gracefully closed")
+                .await,
+            "expected clean shutdown log"
+        );
+
+        // Listener should be closed: a fresh client should fail to connect.
+        let port = harness.port;
+        let client = reqwest::Client::builder()
+            .pool_max_idle_per_host(0)
+            .build()
+            .unwrap();
+        let result = client
+            .get(format!("http://127.0.0.1:{}/test", port))
+            .send()
+            .await;
+        assert!(
+            result.is_err(),
+            "expected connection to fail after shutdown, got {:?}",
+            result
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn shutdown_after_served_request_completes_cleanly() -> Result<()> {
+        let mut harness = TestServerHarness::new().await;
+
+        let resp = harness.client.get(harness.url("/test")).send().await?;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let req = harness.recv().await.unwrap();
+        assert_eq!(req.method, Method::GET);
+
+        // Let the per-connection task drop its `Arc<GracefulShutdown>` clone
+        // before we trigger the shutdown signal.
+        sleep(Duration::from_millis(100)).await;
+
+        harness.trigger_shutdown();
+        harness.await_server_exit().await?;
+
+        assert!(
+            harness
+                .log_contains("Graceful shutdown signal received")
+                .await,
+            "expected shutdown signal log"
+        );
+        assert!(
+            harness
+                .log_contains("All connections gracefully closed")
+                .await,
+            "expected clean shutdown log"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn inflight_connection_prevents_arc_unwrap_and_logs_error() -> Result<()> {
+        let mut harness = TestServerHarness::new().await;
+
+        // Open a raw TCP connection and write only the request headers, leaving
+        // the body incomplete so the server's per-connection task remains parked
+        // on the body collect when we trigger shutdown.
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", harness.port)).await?;
+        stream
+            .write_all(b"POST /test HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\n")
+            .await?;
+        stream.flush().await?;
+
+        // Give the server time to spawn its per-connection task and clone the
+        // `Arc<GracefulShutdown>`.
+        sleep(Duration::from_millis(50)).await;
+
+        harness.trigger_shutdown();
+        harness.await_server_exit().await?;
+
+        assert!(
+            harness
+                .log_contains("Failed to unwrap GracefulShutdown (connections still active)")
+                .await,
+            "expected Arc::try_unwrap failure log"
+        );
 
         Ok(())
     }
