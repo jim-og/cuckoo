@@ -63,10 +63,8 @@ pub async fn run_server<F>(
 where
     F: Future<Output = ()> + Send + 'static,
 {
-    // Address of localhost on port 3000
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
-    // Create a TcpListener and bind it to 127.0.0.1:port
     let listener = TcpListener::bind(addr).await?;
     logger.info(&format!("Listening on http://{}", addr));
 
