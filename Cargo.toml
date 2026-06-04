@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.102"
 async-trait = "0.1.89"
-chrono = "0.4.44"
+chrono = "0.4.45"
 ctrlc = "3.5.2"
 futures = "0.3.32"
 parking_lot = "0.12.5"
