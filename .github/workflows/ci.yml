@@ -40,7 +40,7 @@ jobs:
 
       - name: Install cargo-llvm-cov
         if: github.ref == 'refs/heads/main'
-        uses: taiki-e/install-action@v2.85.3
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: cargo-llvm-cov
 
