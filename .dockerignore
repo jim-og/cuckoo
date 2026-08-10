@@ -1,0 +1,12 @@
+target/
+.git/
+.github/
+.devcontainer/
+.claude/
+tests/
+*.md
+LICENSE
+.gitignore
+.dockerignore
+Dockerfile
+k8s/

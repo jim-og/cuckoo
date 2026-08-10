@@ -17,6 +17,15 @@ impl RouteHandler for StatusHandler {
     }
 }
 
+pub struct HealthHandler;
+
+#[async_trait]
+impl RouteHandler for HealthHandler {
+    async fn handle(&self, _req: HttpRequest) -> Result<HttpResponse, HttpResponse> {
+        Ok(Response::new(full("OK")))
+    }
+}
+
 pub struct TimerHandler {
     event_sender: Sender<TimerEvent>,
     clock: Arc<dyn Clock>,

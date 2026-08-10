@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cuckoo
+  namespace: cuckoo
+  labels:
+    app: cuckoo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cuckoo
+  template:
+    metadata:
+      labels:
+        app: cuckoo
+    spec:
+      containers:
+        - name: cuckoo
+          image: cuckoo:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 1
+            periodSeconds: 5
