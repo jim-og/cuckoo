@@ -9,7 +9,7 @@ async-trait = "0.1.89"
 chrono = "0.4.45"
 ctrlc = "3.5.2"
 futures = "0.3.32"
-parking_lot = "0.12.5"
+parking_lot = "0.13.0"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1.23.3", features = ["v4"] }
 hyper = { version = "1", features = ["full"] }
